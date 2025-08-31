@@ -263,15 +263,16 @@ class UNReportIndexer:
             logger.error(f"Failed to load index: {e}")
             return {'success': False, 'error': str(e)}
     
-    def search(self, query: str, top_k: int = None) -> List[Dict[str, Any]]:
+    def search(self, query: str, top_k: int = None, *, min_threshold: float = None) -> List[Dict[str, Any]]:
         """Search the index for similar chunks."""
         top_k = top_k or self.retrieval_config.get('top_k', 10)
+        min_threshold = min_threshold if min_threshold is not None else self.retrieval_config.get('min_similarity_threshold', 0.3)
         
         if self.index is None:
             logger.error("Index not loaded")
             return []
         
-        logger.info(f"Searching for: '{query[:100]}...' (top_k={top_k})")
+        logger.info(f"Searching for: '{query[:100]}...' (top_k={top_k}, threshold={min_threshold})")
         
         try:
             # Generate query embedding
@@ -289,12 +290,17 @@ class UNReportIndexer:
             search_k = min(top_k * 3, self.index.ntotal)  # Search 3x to account for duplicates
             scores, indices = self.index.search(query_embedding, search_k)
             
-            # Prepare results with deduplication by document
+            # Prepare results with deduplication by document and relevance filtering
             results = []
             seen_documents = set()
             
             for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
                 if idx == -1:  # FAISS returns -1 for missing results
+                    continue
+                
+                # Skip results below similarity threshold
+                if float(score) < min_threshold:
+                    logger.debug(f"Skipping result with low similarity: {score:.3f} < {min_threshold}")
                     continue
                 
                 chunk_data = self.chunk_metadata[idx].copy()
@@ -315,7 +321,9 @@ class UNReportIndexer:
                 if len(results) >= top_k:
                     break
             
-            logger.info(f"Found {len(results)} unique documents from {len([s for s, i in zip(scores[0], indices[0]) if i != -1])} chunks")
+            total_chunks = len([s for s, i in zip(scores[0], indices[0]) if i != -1])
+            relevant_chunks = len([s for s, i in zip(scores[0], indices[0]) if i != -1 and float(s) >= min_threshold])
+            logger.info(f"Found {len(results)} relevant unique documents from {relevant_chunks}/{total_chunks} chunks above threshold {min_threshold}")
             return results
             
         except Exception as e:

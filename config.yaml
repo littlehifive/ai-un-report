@@ -43,6 +43,7 @@ parsing:
 retrieval:
   top_k: 10
   max_context_tokens: 8000
+  min_similarity_threshold: 0.3  # Minimum cosine similarity to consider relevant
   embedding_provider: "openai"  # or "local_bge"
   fallback_to_local: true       # Use BGE if no OpenAI key
   reranker: null  # or "bge-reranker-base"
@@ -65,7 +66,7 @@ paths:
   index_file: "data/index.faiss"
   metadata_file: "data/index.meta.json"
   records_file: "data/records.parquet"
-  chunks_file: "data/2025-core/parsed/chunks.parquet"
+  chunks_file: "data/parsed/chunks.parquet"
 
 # Corpus management
 corpus:

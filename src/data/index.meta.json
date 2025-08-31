@@ -1,0 +1,40 @@
+{
+  "created_at": "2025-08-31T15:24:13.756826",
+  "embedding_provider": "openai",
+  "embedding_dim": 1536,
+  "total_chunks": 2,
+  "chunk_metadata": [
+    {
+      "chunk_id": "A/RES/78/323_000",
+      "doc_id": "A/RES/78/323",
+      "symbol": "A/RES/78/323",
+      "title": "Resolution on Elimination of racism, racial discrimination, xenophobia and related intolerance",
+      "date": "2024-08-13",
+      "organ": "General Assembly",
+      "language": "en",
+      "source_url": "https://digitallibrary.un.org/record/4060789",
+      "section_title": "Introduction",
+      "section_page": 1,
+      "text": "United Nations A/RES/78/323 General Assembly Distr.: General 14 August 2024 24-14711 (E) *2414711* Seventy-eighth session Agenda item 69 Elimination of racism, racial discrimination, xenophobia and related intolerance Resolution adopted by the General Assembly on 13 August 2024 [without reference to a Main Committee (A/78/L.96)] 78/323. International Day of Women and Girls of African Descent The General Assembly, Reaffirming the purposes and principles of the Charter of the United Nations, Recalling the Universal Declaration of Human Rights,1 the International Covenant on Civil and Political Rights2 and the International Covenant on Economic, Social and Cultural Rights,3 the Convention on the Elimination of All Forms of Discrimination against Women,4 which condemns any discrimination against women in all its forms, in particular relevant articles thereof, the International Convention on the Elimination of All Forms of Racial Discrimination, 5 the Convention on the Rights of the Child,6 the Convention on the Rights of Persons with Disabilities 7 and other international instruments related to the rights of women and girls, and the importance of promoting actions to prevent and eliminate all forms of discrimination and violence against women, Recalling also its resolutions 53/199 of 15 December 1998 and 61/185 of 20 December 2006 on the proclamation of international years, and Economic and Social Council resolution 1980/67 of 25 July 1980 on international years and anniversaries, Observing the mutually reinforcing relationship between achieving gender equality and the empowerment of all women and girls and the full realization of all __________________ 1 Resolution 217 A (III). 2 See resolution 2200 A (XXI), annex. 3 Ibid. 4 United Nations, Treaty Series, vol. 1249, No. 20378. 5 Ibid., vol. 660, No. 9464. 6 Ibid., vol. 1577, No. 27531. 7 Ibid., vol. 2515, No. 44910. A/RES/78/323 International Day of Women and Girls of African Descent 24-14711 2/3 their human rights and fundamental freedoms and the implementation of the 2030 Agenda for Sustainable Development,8 and noting in this regard Sustainable Development Goals 5 and 10, which seek, respectively, to achieve gender equality and empower all women and girls and to reduce inequality within and among countries, including through specific measures to address racial discrimination, Reaffirming the Vienna Declaration and Programme of Action,9 as well as the Beijing Declaration and Platform for Action,10 the Programme of Action of the International Conference on Population and Development 11 and the outcomes of their review conferences, Noting the general recommendations of the Committee on the Elimination of Racial Discrimination, especially general recommendation No. 25 (2000) on gender- related dimensions of racial discrimination12 and general recommendation No. 34 (2011) on racial discrimination against people of African descent, 13 Recalling its resolution 68/237 of 23 December 2013, in which it proclaimed the International Decade for People of African Descent, commencing on 1 January 2015 and ending on 31 December 2024, with the theme \u201cPeople of African descent: recognition, justice and development\u201d, and in this regard contributing to the implementation of the Durban Declaration and Programme of Action, Recognizing the significant contribution of all women and girls of African descent to the development of societies and the importance of ensuring the full, equal and meaningful participation and decision-making of women of African descent in all aspects of society, 1. Decides to proclaim 25 July as the International Day of Women and Girls of African Descent, in order to highlight the importance of this day as a moment to commemorate the global fight against slavery and racism and the commitment to achieve gender equality, as well as the significant contribution of all women and girls of African descent to the development of societies; 2. Invites all Member States, organizations of the United Nations system, international and regional organizations and other relevant stakeholders, including civil society, the private sector, academia and the media, to commemorate the International Day in an appropriate manner, promoting events and activities that highlight the history, culture and struggles of women and girls of African descent around the world; 3. Encourages all Member States and the United Nations system to take concrete measures to address and prevent racial and gender-based discrimination, as well as to eliminate all forms of violence against all women and girls of African descent, and to ensure the full enjoyment of human rights by women and girls of African descent; 4.",
+      "char_count": 4708,
+      "token_estimate": 1177,
+      "chunk_index": 0
+    },
+    {
+      "chunk_id": "A/RES/78/323_001",
+      "doc_id": "A/RES/78/323",
+      "symbol": "A/RES/78/323",
+      "title": "Resolution on Elimination of racism, racial discrimination, xenophobia and related intolerance",
+      "date": "2024-08-13",
+      "organ": "General Assembly",
+      "language": "en",
+      "source_url": "https://digitallibrary.un.org/record/4060789",
+      "section_title": "Introduction",
+      "section_page": 1,
+      "text": "onal Day in an appropriate manner, promoting events and activities that highlight the history, culture and struggles of women and girls of African descent around the world; 3. Encourages all Member States and the United Nations system to take concrete measures to address and prevent racial and gender-based discrimination, as well as to eliminate all forms of violence against all women and girls of African descent, and to ensure the full enjoyment of human rights by women and girls of African descent; 4. Emphasizes that the cost of all activities that may result from the implementation of the present resolution should be covered by voluntary contributions, including from the private sector; __________________ 8 Resolution 70/1. 9 A/CONF.157/24 (Part I), chap. III. 10 Report of the Fourth World Conference on Women, Beijing, 4\u201315 September 1995 (United Nations publication, Sales No. E.96.IV.13), chap. I, resolution 1, annexes I and II. 11 Report of the International Conference on Population and Development, Cairo, 5\u201313 September 1994 (United Nations publication, Sales No. E.95.XIII.18), chap. I, resolution 1, annex. 12 Official Records of the General Assembly, Fifty-fifth Session, Supplement No. 18 (A/55/18), annex V, sect. A. 13 Ibid., Sixty-sixth Session, Supplement No. 18 (A/66/18), annex IX. International Day of Women and Girls of African Descent A/RES/78/323 3/3 24-14711 5. Requests the Secretary-General to bring the present resolution to the attention of all States Members of the United Nations, members of the specialized agencies and observers of the General Assembly, as well as the organizations of the United Nations system and other relevant stakeholders, for appropriate observance of the International Day of Women and Girls of African descent. 103rd plenary meeting 13 August 2024",
+      "char_count": 1817,
+      "token_estimate": 454,
+      "chunk_index": 1
+    }
+  ]
+}

@@ -42,9 +42,10 @@ def get_index_cache_key(config):
     meta_path = Path(config['paths']['index_file'].replace('.faiss', '.meta.json'))
     
     # Use modification time as cache key to auto-invalidate on index rebuild
+    # Added version suffix to force cache invalidation after method signature change
     if index_path.exists() and meta_path.exists():
-        return f"{index_path.stat().st_mtime}_{meta_path.stat().st_mtime}"
-    return "no_index"
+        return f"{index_path.stat().st_mtime}_{meta_path.stat().st_mtime}_v2"
+    return "no_index_v2"
 
 @st.cache_resource(show_spinner=False)
 def initialize_indexer(_config, _cache_key):
@@ -73,14 +74,21 @@ def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: 
     
     logger.info("OpenAI API key found")
     
-    # Prepare context from chunks
+    # Prepare context from chunks - use adaptive number based on relevance
+    # Only include chunks that are actually relevant, up to a maximum of 5
     context_parts = []
-    for i, chunk in enumerate(context_chunks[:5], 1):  # Limit to top 5 chunks
+    max_chunks_for_context = min(5, len(context_chunks))  # Use up to 5, but only if they exist
+    
+    for i, chunk in enumerate(context_chunks[:max_chunks_for_context], 1):
+        # Optional: Add additional relevance check here if needed
+        score = chunk.get('similarity_score', 0)
+        logger.info(f"Including chunk {i} with similarity score: {score:.3f}")
+        
         citation = f"[{i}] {chunk['title']} ({chunk['symbol']}, {chunk['date']})"
         context_parts.append(f"{citation}\n{chunk['text']}\n")
     
     context = "\n".join(context_parts)
-    logger.info(f"Context prepared with {len(context)} characters")
+    logger.info(f"Context prepared with {len(context_parts)} relevant chunks ({len(context)} characters)")
     
     # Create prompt
     prompt = f"""You are an AI assistant that helps users understand UN reports. Use the provided context to answer the user's question accurately and concisely.
@@ -128,13 +136,54 @@ ANSWER:"""
         logger.error(f"Traceback: {traceback.format_exc()}")
         return f"❌ Error generating response: {str(e)}"
 
-def format_citations(chunks: List[Dict[str, Any]]) -> str:
-    """Format citations for display."""
+def format_citations(chunks: List[Dict[str, Any]], citation_threshold: float = 0.4, response_text: str = "") -> str:
+    """Format citations for display, filtering by relevance threshold."""
     if not chunks:
         return ""
     
+    # Check if the response indicates no relevant information was found
+    no_info_indicators = [
+        "no specific information",
+        "doesn't contain relevant information",
+        "couldn't find any relevant",
+        "no relevant information",
+        "context doesn't contain",
+        "unable to find specific"
+    ]
+    
+    response_lower = response_text.lower()
+    indicates_no_relevant_info = any(indicator in response_lower for indicator in no_info_indicators)
+    
+    # Filter chunks to only show those above citation threshold
+    # This allows showing only highly relevant citations even if we used more chunks for context
+    relevant_chunks = []
+    for chunk in chunks:
+        score = chunk.get('similarity_score', 0)
+        if score >= citation_threshold:
+            relevant_chunks.append(chunk)
+    
+    # If response indicates no relevant info, be more selective with citations
+    if indicates_no_relevant_info:
+        # Use a higher threshold when no relevant information was found
+        higher_threshold = max(citation_threshold + 0.2, 0.6)
+        very_relevant_chunks = [c for c in relevant_chunks if c.get('similarity_score', 0) >= higher_threshold]
+        
+        if not very_relevant_chunks:
+            return "⚠️ **Note:** The search returned some results, but they don't appear to be directly relevant to your query. The similarity scores were too low to provide meaningful citations."
+        
+        # Show only 1-2 most relevant if response says no info
+        relevant_chunks = very_relevant_chunks[:2]
+        prefix = "⚠️ **Note:** Limited relevant sources found. These are the closest matches:\n\n"
+    else:
+        if not relevant_chunks:
+            return "No sufficiently relevant sources found for this query."
+        prefix = ""
+    
+    # Limit to maximum of 5 citations even if more are relevant
+    max_citations = min(5, len(relevant_chunks))
+    
     citations = []
-    for i, chunk in enumerate(chunks, 1):
+    for i, chunk in enumerate(relevant_chunks[:max_citations], 1):
         title = chunk.get('title', 'Untitled')
         symbol = chunk.get('symbol', 'Unknown')
         date = chunk.get('date', 'Unknown date')
@@ -155,7 +204,8 @@ def format_citations(chunks: List[Dict[str, Any]]) -> str:
 """
         citations.append(citation)
     
-    return "\n".join(citations)
+    logger.info(f"Showing {len(citations)} citations from {len(chunks)} results (threshold: {citation_threshold}, no_info: {indicates_no_relevant_info})")
+    return prefix + "\n".join(citations)
 
 def rebuild_corpus():
     """Rebuild the entire corpus (discover -> fetch -> parse -> index)."""
@@ -279,10 +329,16 @@ def main():
         
         # Query settings
         st.header("⚙️ Search Settings")
-        top_k = st.slider("Results to retrieve", 1, 20, 5)
+        top_k = st.slider("Max results to retrieve", 1, 20, 5)
+        min_threshold = st.slider("Minimum relevance threshold", 0.0, 1.0, 0.3, step=0.05, 
+                                help="Lower values show more results, higher values show only highly relevant results")
+        citation_threshold = st.slider("Citation relevance threshold", 0.0, 1.0, 0.4, step=0.05,
+                                help="Only show citations with relevance above this threshold (higher = fewer but more relevant citations)")
         
-        # Store top_k in session state for access outside sidebar
+        # Store settings in session state for access outside sidebar
         st.session_state.top_k = top_k
+        st.session_state.min_threshold = min_threshold
+        st.session_state.citation_threshold = citation_threshold
         
         # Filters (if we have data)
         if indexer and indexer.chunk_metadata:
@@ -336,8 +392,9 @@ def main():
         with st.spinner("Searching UN reports..."):
             try:
                 # Search for relevant chunks
-                logger.info(f"Searching with top_k={top_k}")
-                results = indexer.search(query, top_k=top_k)
+                min_threshold = st.session_state.get('min_threshold', 0.3)
+                logger.info(f"Searching with top_k={top_k}, threshold={min_threshold}")
+                results = indexer.search(query, top_k=top_k, min_threshold=min_threshold)
                 logger.info(f"Search returned {len(results)} results")
                 
                 if not results:
@@ -349,7 +406,8 @@ def main():
                     logger.info("Generating chat response...")
                     response = get_chat_response(query, results, config)
                     logger.info(f"Response generated: {response[:100]}...")
-                    citations = format_citations(results)
+                    citation_threshold = st.session_state.get('citation_threshold', 0.4)
+                    citations = format_citations(results, citation_threshold, response)
                     logger.info("Citations formatted")
                 
                 # Display response in chat message
@@ -402,8 +460,9 @@ def main():
                     try:
                         # Search for relevant chunks
                         search_top_k = st.session_state.get('top_k', 5)
-                        logger.info(f"Searching with top_k={search_top_k}")
-                        results = indexer.search(example_query, top_k=search_top_k)
+                        search_threshold = st.session_state.get('min_threshold', 0.3)
+                        logger.info(f"Searching with top_k={search_top_k}, threshold={search_threshold}")
+                        results = indexer.search(example_query, top_k=search_top_k, min_threshold=search_threshold)
                         logger.info(f"Search returned {len(results)} results")
                         
                         if not results:
@@ -414,7 +473,8 @@ def main():
                             logger.info("Generating chat response...")
                             response = get_chat_response(example_query, results, config)
                             logger.info(f"Response generated: {response[:100]}...")
-                            citations = format_citations(results)
+                            citation_threshold = st.session_state.get('citation_threshold', 0.4)
+                            citations = format_citations(results, citation_threshold, response)
                         
                         # Add assistant response to history
                         st.session_state.messages.append({
