@@ -1,0 +1,49 @@
+# UN Reports RAG Configuration
+
+# Data collection settings
+date_window_days: 365
+languages: ["en"]
+throttle:
+  delay_seconds: 5
+  max_retries: 3
+
+# UN bodies to prioritize
+target_bodies:
+  - "General Assembly"
+  - "Security Council" 
+  - "Economic and Social Council"
+  - "Trusteeship Council"
+  - "Secretariat"
+
+# Document processing
+parsing:
+  chunk_tokens: 1200
+  overlap_tokens: 150
+  min_chunk_length: 100
+
+# Retrieval settings
+retrieval:
+  top_k: 10
+  max_context_tokens: 8000
+  embedding_provider: "openai"  # or "local_bge"
+  reranker: null  # or "bge-reranker-base"
+
+# OpenAI settings (optimized for cost)
+openai:
+  embedding_model: "text-embedding-3-small"  # Cheapest embedding model
+  chat_model: "gpt-3.5-turbo"               # Much cheaper than GPT-4
+  max_tokens: 1000                          # Reduced tokens to save cost
+
+# Local BGE fallback
+local_embeddings:
+  model: "BAAI/bge-small-en-v1.5"
+  device: "cpu"
+
+# File paths
+paths:
+  raw_data: "data/raw"
+  parsed_data: "data/parsed"
+  index_file: "data/index.faiss"
+  metadata_file: "data/index.meta.json"
+  records_file: "data/records.parquet"
+  chunks_file: "data/parsed/chunks.parquet"

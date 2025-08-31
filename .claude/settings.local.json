@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:digitallibrary.un.org)",
+      "Bash(chmod:*)",
+      "Bash(make:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(streamlit run:*)",
+      "Bash(timeout:*)",
+      "Bash(pdfinfo:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
