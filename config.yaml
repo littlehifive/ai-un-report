@@ -7,13 +7,31 @@ throttle:
   delay_seconds: 5
   max_retries: 3
 
-# UN bodies to prioritize
+# Usage controls for cost management
+rate_limiting:
+  max_queries_per_hour: 20
+  cooldown_seconds: 3
+  enable_fallback: true
+
+# UN bodies to prioritize (high-impact reports)
 target_bodies:
   - "General Assembly"
   - "Security Council" 
   - "Economic and Social Council"
+  - "Secretary-General"
   - "Trusteeship Council"
   - "Secretariat"
+
+# High-priority report types
+priority_keywords:
+  - "annual report"
+  - "progress report"
+  - "situation"
+  - "climate"
+  - "sustainable development"
+  - "peacekeeping"
+  - "humanitarian"
+  - "human rights"
 
 # Document processing
 parsing:
@@ -26,6 +44,7 @@ retrieval:
   top_k: 10
   max_context_tokens: 8000
   embedding_provider: "openai"  # or "local_bge"
+  fallback_to_local: true       # Use BGE if no OpenAI key
   reranker: null  # or "bge-reranker-base"
 
 # OpenAI settings (optimized for cost)
@@ -41,9 +60,16 @@ local_embeddings:
 
 # File paths
 paths:
-  raw_data: "data/raw"
-  parsed_data: "data/parsed"
+  raw_data: "data/2025-core/raw"
+  parsed_data: "data/2025-core/parsed"
   index_file: "data/index.faiss"
   metadata_file: "data/index.meta.json"
   records_file: "data/records.parquet"
-  chunks_file: "data/parsed/chunks.parquet"
+  chunks_file: "data/2025-core/parsed/chunks.parquet"
+
+# Corpus management
+corpus:
+  target_documents: 300        # Expanded for better RAG coverage
+  max_size_gb: 4              # Allow larger corpus
+  prioritize_recent: true      # Favor newer documents
+  core_only: false             # Use expanded dataset

@@ -242,18 +242,13 @@ def main():
             # Show cache status for debugging
             st.caption(f"🔑 Cache key: `{cache_key[:20]}...`")
             
-            # Calculate actual document count (exclude error pages)
+            # Calculate accurate document and chunk counts
             if hasattr(indexer, 'chunk_metadata') and indexer.chunk_metadata:
-                # Count unique documents, excluding error pages
-                valid_docs = set()
-                for chunk in indexer.chunk_metadata:
-                    text = chunk.get('text', '')
-                    # Skip error pages (those containing ODS error message)
-                    if 'does not exist in the Official Document System' not in text:
-                        valid_docs.add(chunk.get('doc_id', ''))
-                doc_count = len(valid_docs)
-                chunk_count = len([c for c in indexer.chunk_metadata 
-                                 if 'does not exist in the Official Document System' not in c.get('text', '')])
+                # Count unique documents by symbol (most reliable identifier)
+                doc_count = len(set(chunk.get('symbol', '') for chunk in indexer.chunk_metadata if chunk.get('symbol')))
+                chunk_count = len(indexer.chunk_metadata)
+                
+                # File count removed to avoid confusion since 181 files != 52 documents
             else:
                 doc_count = 0 
                 chunk_count = 0
@@ -386,10 +381,12 @@ def main():
     if len(st.session_state.messages) == 0:
         st.markdown("### 💡 Try asking about:")
         example_queries = [
-            "What did the Secretary-General report on climate change?",
-            "Recent Security Council resolutions on peacekeeping",
-            "Economic and Social Council recommendations for sustainable development",
-            "What are the main challenges mentioned in recent UN reports?"
+            "What information on decolonization has been reported?",
+            "Show me Statistical Commission reports from 2025",
+            "What did ESCAP report in their annual report?",
+            "Recent Economic Commission reports and findings",
+            "What peacekeeping activities are mentioned in recent reports?",
+            "Technology and innovation developments in 2025"
         ]
         
         for example_query in example_queries:

@@ -284,21 +284,38 @@ class UNReportIndexer:
             # Normalize query embedding
             faiss.normalize_L2(query_embedding)
             
-            # Search
-            scores, indices = self.index.search(query_embedding, min(top_k, self.index.ntotal))
+            # Search with expanded results to allow for deduplication
+            # We may need more chunks than top_k to get top_k unique documents
+            search_k = min(top_k * 3, self.index.ntotal)  # Search 3x to account for duplicates
+            scores, indices = self.index.search(query_embedding, search_k)
             
-            # Prepare results
+            # Prepare results with deduplication by document
             results = []
+            seen_documents = set()
+            
             for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
                 if idx == -1:  # FAISS returns -1 for missing results
                     continue
                 
                 chunk_data = self.chunk_metadata[idx].copy()
+                
+                # Use symbol as primary identifier, fallback to source_url, then title
+                doc_id = chunk_data.get('symbol') or chunk_data.get('source_url') or chunk_data.get('title', f'chunk_{idx}')
+                
+                # Skip if we've already seen this document
+                if doc_id in seen_documents:
+                    continue
+                
+                seen_documents.add(doc_id)
                 chunk_data['similarity_score'] = float(score)
-                chunk_data['rank'] = i + 1
+                chunk_data['rank'] = len(results) + 1  # Rank based on unique documents, not chunks
                 results.append(chunk_data)
+                
+                # Stop when we have enough unique documents
+                if len(results) >= top_k:
+                    break
             
-            logger.info(f"Found {len(results)} results")
+            logger.info(f"Found {len(results)} unique documents from {len([s for s, i in zip(scores[0], indices[0]) if i != -1])} chunks")
             return results
             
         except Exception as e:
