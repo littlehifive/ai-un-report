@@ -36,17 +36,27 @@ def load_app_config():
     """Load configuration (cached)."""
     return load_config()
 
-@st.cache_resource
-def initialize_indexer(_config):
-    """Initialize and load the FAISS indexer (cached)."""
+def get_index_cache_key(config):
+    """Generate cache key based on index file modification time."""
+    index_path = Path(config['paths']['index_file'])
+    meta_path = Path(config['paths']['index_file'].replace('.faiss', '.meta.json'))
+    
+    # Use modification time as cache key to auto-invalidate on index rebuild
+    if index_path.exists() and meta_path.exists():
+        return f"{index_path.stat().st_mtime}_{meta_path.stat().st_mtime}"
+    return "no_index"
+
+@st.cache_resource(show_spinner=False)
+def initialize_indexer(_config, _cache_key):
+    """Initialize and load the FAISS indexer (cached with auto-invalidation)."""
     indexer = UNReportIndexer(_config)
     load_result = indexer.load_index()
     
     if load_result['success']:
-        st.success(f"Index loaded: {load_result['total_chunks']} chunks")
+        st.success(f"✅ Index loaded: {load_result['total_chunks']} chunks from {load_result.get('index_date', 'unknown date')}")
         return indexer, load_result
     else:
-        st.error(f"Failed to load index: {load_result['error']}")
+        st.error(f"❌ Failed to load index: {load_result['error']}")
         return None, load_result
 
 def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: Dict[str, Any]) -> str:
@@ -132,12 +142,16 @@ def format_citations(chunks: List[Dict[str, Any]]) -> str:
         url = chunk.get('source_url', '#')
         score = chunk.get('similarity_score', 0)
         
+        # Extract record ID for debugging
+        record_id = url.split('/record/')[-1].split('/')[0] if '/record/' in url else 'unknown'
+        
         citation = f"""
-**[{i}]** [{title}]({url})
+**[{i}]** [{title[:80]}...]({url})
 - **UN Symbol:** {symbol}
 - **Date:** {date}  
 - **Organ:** {organ}
 - **Relevance:** {score:.3f}
+- **Record ID:** {record_id}
 """
         citations.append(citation)
     
@@ -214,16 +228,38 @@ def main():
     # Load configuration
     config = load_app_config()
     
+    # Initialize indexer first (needed for both sidebar and main interface)
+    cache_key = get_index_cache_key(config)
+    indexer, load_result = initialize_indexer(config, cache_key)
+    
     # Sidebar
     with st.sidebar:
         st.header("📊 Corpus Status")
         
-        # Try to load indexer
-        indexer, load_result = initialize_indexer(config)
-        
         if indexer:
             stats = indexer.get_index_stats()
-            st.metric("Total Documents", stats.get('total_chunks', 0))
+            
+            # Show cache status for debugging
+            st.caption(f"🔑 Cache key: `{cache_key[:20]}...`")
+            
+            # Calculate actual document count (exclude error pages)
+            if hasattr(indexer, 'chunk_metadata') and indexer.chunk_metadata:
+                # Count unique documents, excluding error pages
+                valid_docs = set()
+                for chunk in indexer.chunk_metadata:
+                    text = chunk.get('text', '')
+                    # Skip error pages (those containing ODS error message)
+                    if 'does not exist in the Official Document System' not in text:
+                        valid_docs.add(chunk.get('doc_id', ''))
+                doc_count = len(valid_docs)
+                chunk_count = len([c for c in indexer.chunk_metadata 
+                                 if 'does not exist in the Official Document System' not in c.get('text', '')])
+            else:
+                doc_count = 0 
+                chunk_count = 0
+                
+            st.metric("UN Documents", doc_count)
+            st.metric("Content Chunks", chunk_count)
             st.metric("Embedding Provider", stats.get('embedding_provider', 'Unknown'))
             
             if stats.get('created_at'):
@@ -240,6 +276,11 @@ def main():
         if st.button("🔄 Rebuild Corpus", help="Discover, fetch, parse, and index recent UN reports"):
             if rebuild_corpus():
                 st.rerun()  # Refresh the app after rebuild
+        
+        if st.button("🧹 Clear Cache", help="Clear cached data and reload index"):
+            st.cache_resource.clear()
+            st.success("Cache cleared! The page will refresh...")
+            st.rerun()
         
         # Query settings
         st.header("⚙️ Search Settings")

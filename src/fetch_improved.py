@@ -1,4 +1,4 @@
-"""Fetching module for downloading UN report files."""
+"""Improved Fetching module for downloading UN report files with proper URL validation."""
 
 import logging
 import requests
@@ -8,13 +8,14 @@ from typing import List, Dict, Any, Optional
 import hashlib
 from urllib.parse import urlparse
 import time
+import re
 
 from utils import load_config, RateLimiter, ensure_dir, safe_filename, get_file_hash
 
 logger = logging.getLogger(__name__)
 
-class UNReportFetcher:
-    """Downloads UN report files from discovered records."""
+class ImprovedUNReportFetcher:
+    """Improved downloader for UN report files with proper URL validation."""
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
@@ -38,7 +39,7 @@ class UNReportFetcher:
         else:
             return pd.DataFrame(columns=[
                 'symbol', 'url', 'filename', 'status', 'http_code', 
-                'file_size', 'checksum', 'download_date', 'error_msg'
+                'file_size', 'checksum', 'download_date', 'error_msg', 'validation_status'
             ])
     
     def _save_manifest(self) -> None:
@@ -92,8 +93,54 @@ class UNReportFetcher:
                 url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
                 return f"doc_{url_hash}.{language}.pdf"
     
+    def _validate_url_before_download(self, url: str) -> Dict[str, Any]:
+        """Validate URL before attempting download."""
+        validation_result = {
+            'is_valid': False,
+            'error_msg': None,
+            'content_type': None,
+            'file_size': None,
+            'redirects_to': None
+        }
+        
+        try:
+            # First, check if URL is accessible
+            response = self.session.head(url, timeout=30, allow_redirects=True)
+            
+            if response.status_code == 200:
+                content_type = response.headers.get('content-type', '').lower()
+                validation_result['content_type'] = content_type
+                
+                # Check if it's actually a PDF
+                if 'application/pdf' in content_type:
+                    validation_result['is_valid'] = True
+                    validation_result['file_size'] = response.headers.get('content-length')
+                elif 'text/html' in content_type:
+                    # Check if it's an error page
+                    validation_result['error_msg'] = "URL returns HTML instead of PDF"
+                else:
+                    validation_result['error_msg'] = f"Unexpected content type: {content_type}"
+                    
+            elif response.status_code == 404:
+                validation_result['error_msg'] = "File not found (HTTP 404)"
+            else:
+                validation_result['error_msg'] = f"HTTP {response.status_code}: {response.reason}"
+                
+            # Check for redirects
+            if response.history:
+                validation_result['redirects_to'] = response.url
+                
+        except requests.exceptions.Timeout:
+            validation_result['error_msg'] = "Request timeout during validation"
+        except requests.exceptions.RequestException as e:
+            validation_result['error_msg'] = f"Request failed during validation: {e}"
+        except Exception as e:
+            validation_result['error_msg'] = f"Unexpected error during validation: {e}"
+        
+        return validation_result
+    
     def download_file(self, url: str, symbol: str, language: str = 'en') -> Dict[str, Any]:
-        """Download a single file and return status info."""
+        """Download a single file with enhanced validation."""
         logger.info(f"Downloading {symbol}: {url}")
         
         # Check if already downloaded
@@ -103,6 +150,24 @@ class UNReportFetcher:
                 (self.manifest['url'] == url) & (self.manifest['symbol'] == symbol)
             ].iloc[0]
             return existing_entry.to_dict()
+        
+        # Validate URL before download
+        validation = self._validate_url_before_download(url)
+        if not validation['is_valid']:
+            logger.warning(f"URL validation failed for {symbol}: {validation['error_msg']}")
+            result = {
+                'symbol': symbol,
+                'url': url,
+                'filename': None,
+                'status': 'error',
+                'http_code': None,
+                'file_size': None,
+                'checksum': None,
+                'download_date': pd.Timestamp.now(),
+                'error_msg': f"URL validation failed: {validation['error_msg']}",
+                'validation_status': 'failed'
+            }
+            return result
         
         # Generate filename
         filename = self._generate_filename(url, symbol, language)
@@ -120,23 +185,22 @@ class UNReportFetcher:
             'file_size': None,
             'checksum': None,
             'download_date': pd.Timestamp.now(),
-            'error_msg': None
+            'error_msg': None,
+            'validation_status': 'passed'
         }
         
         try:
-            # Follow redirects and handle UNDL file serving
-            response = self.session.get(url, timeout=60, stream=True, allow_redirects=True)
+            # Download file with proper headers
+            headers = {
+                'Accept': 'application/pdf,*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://digitallibrary.un.org/'
+            }
+            
+            response = self.session.get(url, timeout=60, stream=True, headers=headers)
             result['http_code'] = response.status_code
             
             if response.status_code == 200:
-                # Check content type to ensure it's actually a file
-                content_type = response.headers.get('content-type', '').lower()
-                if 'text/html' in content_type:
-                    # Likely an error page or redirect page, not the actual file
-                    result['error_msg'] = f"Received HTML page instead of file (content-type: {content_type})"
-                    logger.warning(f"File {symbol} returned HTML instead of document: {url}")
-                    return result
-                
                 # Download file in chunks
                 total_size = 0
                 with open(file_path, 'wb') as f:
@@ -150,6 +214,20 @@ class UNReportFetcher:
                     result['error_msg'] = f"Downloaded file too small ({total_size} bytes), likely an error page"
                     logger.warning(f"Downloaded file {filename} is suspiciously small: {total_size} bytes")
                     file_path.unlink(missing_ok=True)  # Remove invalid file
+                    return result
+                
+                # Verify it's actually a PDF by checking file header
+                try:
+                    with open(file_path, 'rb') as f:
+                        header = f.read(4)
+                        if header != b'%PDF':
+                            result['error_msg'] = "Downloaded file is not a valid PDF"
+                            logger.warning(f"Downloaded file {filename} is not a PDF")
+                            file_path.unlink(missing_ok=True)
+                            return result
+                except Exception as e:
+                    result['error_msg'] = f"Failed to verify PDF header: {e}"
+                    file_path.unlink(missing_ok=True)
                     return result
                 
                 # Calculate file stats
@@ -182,7 +260,7 @@ class UNReportFetcher:
         return result
 
     def download_file_with_fallbacks(self, file_urls: List[str], symbol: str, language: str = 'en') -> Dict[str, Any]:
-        """Download a file trying multiple URLs with fallback strategies."""
+        """Download a file trying multiple URLs with enhanced validation."""
         
         # Check if already successfully downloaded
         if self._is_already_downloaded_symbol(symbol):
@@ -205,10 +283,11 @@ class UNReportFetcher:
             'download_date': pd.Timestamp.now(),
             'error_msg': None,
             'attempts': 0,
-            'successful_url': None
+            'successful_url': None,
+            'validation_status': 'not_attempted'
         }
         
-        # Try each URL with exponential backoff
+        # Try each URL with enhanced validation
         for attempt, url in enumerate(file_urls, 1):
             result['attempts'] = attempt
             result['url'] = url
@@ -224,42 +303,28 @@ class UNReportFetcher:
                 else:
                     self.rate_limiter.wait()
                 
-                # Try to download with enhanced headers and error detection
+                # Validate URL first
+                validation = self._validate_url_before_download(url)
+                if not validation['is_valid']:
+                    logger.warning(f"URL {attempt} validation failed for {symbol}: {validation['error_msg']}")
+                    result['error_msg'] = f"URL validation failed: {validation['error_msg']}"
+                    result['validation_status'] = 'failed'
+                    continue
+                
+                # Download with enhanced headers
                 headers = {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
                     'Accept': 'application/pdf,*/*',
-                    'Accept-Language': 'en-US,en;q=0.9'
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Referer': 'https://digitallibrary.un.org/'
                 }
                 
-                response = self.session.get(url, timeout=60, stream=True, allow_redirects=True, headers=headers)
+                response = self.session.get(url, timeout=60, stream=True, headers=headers)
                 result['http_code'] = response.status_code
                 
                 if response.status_code == 200:
-                    # Enhanced content validation
-                    content_type = response.headers.get('content-type', '').lower()
-                    
-                    # Check if it's HTML (likely error page)
-                    if 'text/html' in content_type:
-                        # Read first chunk to check for error messages
-                        first_chunk = next(response.iter_content(chunk_size=1024), b'')
-                        content_preview = first_chunk.decode('utf-8', errors='ignore').lower()
-                        
-                        if any(error_phrase in content_preview for error_phrase in 
-                               ['not found', 'does not exist', 'error', '404', 'access denied']):
-                            logger.warning(f"URL {attempt} returned error page for {symbol}")
-                            result['error_msg'] = "Received HTML error page instead of document"
-                            continue
-                        
-                        # If HTML but no clear error, might be a redirect page - continue to next URL
-                        logger.warning(f"URL {attempt} returned HTML page for {symbol}, trying next...")
-                        result['error_msg'] = "Received HTML page instead of PDF"
-                        continue
-                    
                     # Download file in chunks
                     total_size = 0
                     with open(file_path, 'wb') as f:
-                        # Re-request since we consumed some content for validation
-                        response = self.session.get(url, timeout=60, stream=True, allow_redirects=True, headers=headers)
                         for chunk in response.iter_content(chunk_size=8192):
                             if chunk:
                                 f.write(chunk)
@@ -272,11 +337,26 @@ class UNReportFetcher:
                         result['error_msg'] = f"File too small ({total_size} bytes)"
                         continue
                     
+                    # Verify PDF header
+                    try:
+                        with open(file_path, 'rb') as f:
+                            header = f.read(4)
+                            if header != b'%PDF':
+                                result['error_msg'] = "Downloaded file is not a valid PDF"
+                                logger.warning(f"Downloaded file {filename} is not a PDF")
+                                file_path.unlink(missing_ok=True)
+                                continue
+                    except Exception as e:
+                        result['error_msg'] = f"Failed to verify PDF header: {e}"
+                        file_path.unlink(missing_ok=True)
+                        continue
+                    
                     # Success!
                     result['file_size'] = total_size
                     result['checksum'] = get_file_hash(file_path)
                     result['status'] = 'success'
                     result['successful_url'] = url
+                    result['validation_status'] = 'passed'
                     
                     logger.info(f"Successfully downloaded {symbol} from URL {attempt}/{len(file_urls)} ({total_size} bytes)")
                     return result
@@ -319,8 +399,8 @@ class UNReportFetcher:
         return f"{safe_symbol}.{language}.pdf"
     
     def fetch_from_records(self, records_file: str) -> Dict[str, Any]:
-        """Fetch all files from discovered records."""
-        logger.info(f"Starting fetch from {records_file}")
+        """Fetch all files from discovered records with enhanced validation."""
+        logger.info(f"Starting improved fetch from {records_file}")
         
         # Load records
         try:
@@ -350,6 +430,7 @@ class UNReportFetcher:
             
             if not file_urls or len(file_urls) == 0:
                 logger.warning(f"No file URLs found for {symbol}")
+                failed_downloads += 1
                 continue
                 
             # Clean file URLs list
@@ -438,6 +519,7 @@ class UNReportFetcher:
         
         return cleaned_count
 
+
 def main():
     """Main function for standalone execution."""
     from utils import setup_logging
@@ -445,7 +527,7 @@ def main():
     setup_logging()
     config = load_config()
     
-    fetcher = UNReportFetcher(config)
+    fetcher = ImprovedUNReportFetcher(config)
     
     # Fetch from discovered records
     records_file = config['paths']['records_file']
@@ -467,6 +549,7 @@ def main():
     print(f"Successful: {status['successful']}")
     print(f"Failed: {status['failed']}")
     print(f"Total size: {status['total_size_mb']} MB")
+
 
 if __name__ == "__main__":
     main()
