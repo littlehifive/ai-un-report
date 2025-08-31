@@ -245,6 +245,9 @@ def main():
         st.header("⚙️ Search Settings")
         top_k = st.slider("Results to retrieve", 1, 20, 5)
         
+        # Store top_k in session state for access outside sidebar
+        st.session_state.top_k = top_k
+        
         # Filters (if we have data)
         if indexer and indexer.chunk_metadata:
             st.header("🔍 Filters")
@@ -348,10 +351,46 @@ def main():
             "What are the main challenges mentioned in recent UN reports?"
         ]
         
-        for query in example_queries:
-            if st.button(f"💬 {query}"):
-                st.session_state.messages.append({"role": "user", "content": query})
-                st.rerun()
+        for example_query in example_queries:
+            if st.button(f"💬 {example_query}", key=f"example_{example_query[:20]}"):
+                # Process the query immediately
+                logger.info(f"Processing example query: {example_query}")
+                
+                # Add user message to history
+                st.session_state.messages.append({"role": "user", "content": example_query})
+                
+                # Generate response
+                with st.spinner("Searching UN reports..."):
+                    try:
+                        # Search for relevant chunks
+                        search_top_k = st.session_state.get('top_k', 5)
+                        logger.info(f"Searching with top_k={search_top_k}")
+                        results = indexer.search(example_query, top_k=search_top_k)
+                        logger.info(f"Search returned {len(results)} results")
+                        
+                        if not results:
+                            response = "I couldn't find any relevant information in the UN reports corpus for your query."
+                            citations = ""
+                        else:
+                            # Generate response using retrieved context
+                            logger.info("Generating chat response...")
+                            response = get_chat_response(example_query, results, config)
+                            logger.info(f"Response generated: {response[:100]}...")
+                            citations = format_citations(results)
+                        
+                        # Add assistant response to history
+                        st.session_state.messages.append({
+                            "role": "assistant", 
+                            "content": response,
+                            "citations": citations
+                        })
+                        
+                        # Rerun to display the messages
+                        st.rerun()
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing example query: {e}")
+                        st.error(f"❌ An error occurred: {str(e)}")
 
 if __name__ == "__main__":
     main()

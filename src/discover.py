@@ -54,44 +54,8 @@ class UNReportDiscoverer:
         """Get curated seed data of recent UN reports."""
         logger.info("Using curated seed data for recent reports...")
         
-        # Curated list of recent high-value UN reports
+        # Curated list of recent high-value UN reports with direct ODS links
         seed_reports = [
-            {
-                'title': 'Report of the Secretary-General on the work of the Organization',
-                'symbol': 'A/78/1',
-                'date': '2023-08-28',
-                'organ': 'General Assembly',
-                'language': 'en',
-                'record_url': 'https://digitallibrary.un.org/record/4025952',
-                'file_urls': ['https://digitallibrary.un.org/record/4025952/files/A_78_1-EN.pdf']
-            },
-            {
-                'title': 'Report of the Security Council to the General Assembly',
-                'symbol': 'A/78/2',  
-                'date': '2023-07-31',
-                'organ': 'Security Council',
-                'language': 'en',
-                'record_url': 'https://digitallibrary.un.org/record/4021147',
-                'file_urls': ['https://digitallibrary.un.org/record/4021147/files/A_78_2-EN.pdf']
-            },
-            {
-                'title': 'Global Sustainable Development Report 2023',
-                'symbol': 'E/CN.16/2023/2',
-                'date': '2023-05-15', 
-                'organ': 'Economic and Social Council',
-                'language': 'en',
-                'record_url': 'https://digitallibrary.un.org/record/4007894',
-                'file_urls': ['https://digitallibrary.un.org/record/4007894/files/E_CN.16_2023_2-EN.pdf']
-            },
-            {
-                'title': 'Report on the activities of the Office of Internal Oversight Services',
-                'symbol': 'A/78/326',
-                'date': '2023-08-18',
-                'organ': 'General Assembly', 
-                'language': 'en',
-                'record_url': 'https://digitallibrary.un.org/record/4025121',
-                'file_urls': ['https://digitallibrary.un.org/record/4025121/files/A_78_326-EN.pdf']
-            },
             {
                 'title': 'Resolution on Elimination of racism, racial discrimination, xenophobia and related intolerance',
                 'symbol': 'A/RES/78/323',
@@ -100,6 +64,42 @@ class UNReportDiscoverer:
                 'language': 'en', 
                 'record_url': 'https://digitallibrary.un.org/record/4060789',
                 'file_urls': ['https://digitallibrary.un.org/record/4060789/files/A_RES_78_323-EN.pdf']
+            },
+            {
+                'title': 'Progress towards the Sustainable Development Goals: Report of the Secretary-General',
+                'symbol': 'E/2024/1',
+                'date': '2024-05-10',
+                'organ': 'Economic and Social Council',
+                'language': 'en',
+                'record_url': 'https://digitallibrary.un.org/record/4045886',
+                'file_urls': ['https://documents.un.org/doc/undoc/gen/n24/117/09/pdf/n2411709.pdf']
+            },
+            {
+                'title': 'Our Common Agenda - Report on Climate Action',
+                'symbol': 'A/78/246',
+                'date': '2023-07-27',
+                'organ': 'General Assembly',
+                'language': 'en',
+                'record_url': 'https://digitallibrary.un.org/record/4018154',
+                'file_urls': ['https://documents.un.org/doc/undoc/gen/n23/219/83/pdf/n2321983.pdf']
+            },
+            {
+                'title': 'Situation in the Middle East',
+                'symbol': 'S/2024/173',
+                'date': '2024-02-26',
+                'organ': 'Security Council',
+                'language': 'en',
+                'record_url': 'https://digitallibrary.un.org/record/4038204',
+                'file_urls': ['https://documents.un.org/doc/undoc/gen/n24/051/57/pdf/n2405157.pdf']
+            },
+            {
+                'title': 'Women and peace and security',
+                'symbol': 'S/2024/798',
+                'date': '2024-10-09',
+                'organ': 'Security Council',
+                'language': 'en',
+                'record_url': 'https://digitallibrary.un.org/record/4055444',
+                'file_urls': ['https://documents.un.org/doc/undoc/gen/n24/309/72/pdf/n2430972.pdf']
             }
         ]
         

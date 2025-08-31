@@ -10,7 +10,8 @@
       "Bash(timeout:*)",
       "Bash(pdfinfo:*)",
       "Bash(curl:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(./scripts/build_all.sh:*)"
     ],
     "deny": [],
     "ask": []
