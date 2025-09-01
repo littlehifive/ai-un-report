@@ -1,0 +1,215 @@
+{
+  "session_id": "golden_eval_20queries_20250901",
+  "total_queries": 20,
+  "successful_queries": 20,
+  "success_rate": 1.0,
+  "avg_docs": 4.6,
+  "category_performance": {
+    "technology": {
+      "total": 3,
+      "success": 3
+    },
+    "peace_security": {
+      "total": 3,
+      "success": 3
+    },
+    "human_rights": {
+      "total": 3,
+      "success": 3
+    },
+    "governance": {
+      "total": 6,
+      "success": 6
+    },
+    "development": {
+      "total": 4,
+      "success": 4
+    },
+    "environment": {
+      "total": 1,
+      "success": 1
+    }
+  },
+  "detailed_results": [
+    {
+      "query": 1,
+      "question": "What does the UNCTAD Technology and Innovation Report 2025 say about artificial intelligence for dev...",
+      "category": "technology",
+      "docs_found": 2,
+      "response_length": 2338,
+      "time_s": 8.712407112121582,
+      "success": true
+    },
+    {
+      "query": 2,
+      "question": "What are the key recommendations for AI implementation in developing countries according to recent U...",
+      "category": "technology",
+      "docs_found": 2,
+      "response_length": 2869,
+      "time_s": 7.802242040634155,
+      "success": true
+    },
+    {
+      "query": 3,
+      "question": "What peacekeeping challenges are discussed in Security Council reports from 2025?...",
+      "category": "peace_security",
+      "docs_found": 5,
+      "response_length": 3108,
+      "time_s": 10.508150100708008,
+      "success": true
+    },
+    {
+      "query": 4,
+      "question": "What does Security Council document S/2025/446 specifically address?...",
+      "category": "peace_security",
+      "docs_found": 5,
+      "response_length": 528,
+      "time_s": 5.870357990264893,
+      "success": true
+    },
+    {
+      "query": 5,
+      "question": "What are the main themes discussed in the Commission on the Status of Women reports from 2025?...",
+      "category": "human_rights",
+      "docs_found": 5,
+      "response_length": 3177,
+      "time_s": 13.38250184059143,
+      "success": true
+    },
+    {
+      "query": 6,
+      "question": "What recommendations does document E/CN.6/2025/3 make regarding women's economic empowerment?...",
+      "category": "human_rights",
+      "docs_found": 5,
+      "response_length": 2276,
+      "time_s": 10.083147048950195,
+      "success": true
+    },
+    {
+      "query": 7,
+      "question": "What are the key priorities outlined in General Assembly documents from 2025?...",
+      "category": "governance",
+      "docs_found": 5,
+      "response_length": 2835,
+      "time_s": 13.04514479637146,
+      "success": true
+    },
+    {
+      "query": 8,
+      "question": "What does General Assembly document A/80/16 specifically cover?...",
+      "category": "governance",
+      "docs_found": 5,
+      "response_length": 879,
+      "time_s": 5.597800970077515,
+      "success": true
+    },
+    {
+      "query": 9,
+      "question": "What development priorities are highlighted in UNDP reports from 2025?...",
+      "category": "development",
+      "docs_found": 5,
+      "response_length": 3715,
+      "time_s": 11.051589965820312,
+      "success": true
+    },
+    {
+      "query": 10,
+      "question": "How do UNDP documents assess progress on Sustainable Development Goals?...",
+      "category": "development",
+      "docs_found": 5,
+      "response_length": 3522,
+      "time_s": 12.301069021224976,
+      "success": true
+    },
+    {
+      "query": 11,
+      "question": "What organizational improvements does the Joint Inspection Unit recommend in its 2025 reports?...",
+      "category": "governance",
+      "docs_found": 5,
+      "response_length": 2781,
+      "time_s": 10.13956880569458,
+      "success": true
+    },
+    {
+      "query": 12,
+      "question": "What specific findings are presented in JIU report JIU/REP/2025/1?...",
+      "category": "governance",
+      "docs_found": 3,
+      "response_length": 2690,
+      "time_s": 9.747081995010376,
+      "success": true
+    },
+    {
+      "query": 13,
+      "question": "How do different UN agencies approach climate change mitigation according to 2025 reports?...",
+      "category": "environment",
+      "docs_found": 5,
+      "response_length": 3605,
+      "time_s": 12.986069917678833,
+      "success": true
+    },
+    {
+      "query": 14,
+      "question": "What common challenges in multilateral cooperation are identified across UN documents from 2025?...",
+      "category": "governance",
+      "docs_found": 5,
+      "response_length": 3356,
+      "time_s": 12.186422109603882,
+      "success": true
+    },
+    {
+      "query": 15,
+      "question": "How do recent UN reports address digital transformation and technology governance?...",
+      "category": "technology",
+      "docs_found": 5,
+      "response_length": 3355,
+      "time_s": 8.636144876480103,
+      "success": true
+    },
+    {
+      "query": 16,
+      "question": "What regional security concerns are most frequently mentioned in 2025 Security Council documents?...",
+      "category": "peace_security",
+      "docs_found": 5,
+      "response_length": 2835,
+      "time_s": 8.119607210159302,
+      "success": true
+    },
+    {
+      "query": 17,
+      "question": "How do Economic and Social Council documents from 2025 address post-pandemic recovery?...",
+      "category": "development",
+      "docs_found": 5,
+      "response_length": 2994,
+      "time_s": 7.801478862762451,
+      "success": true
+    },
+    {
+      "query": 18,
+      "question": "What budget and administrative matters are discussed in recent General Assembly session documents?...",
+      "category": "governance",
+      "docs_found": 5,
+      "response_length": 2998,
+      "time_s": 8.421038150787354,
+      "success": true
+    },
+    {
+      "query": 19,
+      "question": "What long-term strategic priorities does the UN system identify for sustainable development?...",
+      "category": "development",
+      "docs_found": 5,
+      "response_length": 3213,
+      "time_s": 11.478570938110352,
+      "success": true
+    },
+    {
+      "query": 20,
+      "question": "How do different UN bodies coordinate on human rights issues according to 2025 documents?...",
+      "category": "human_rights",
+      "docs_found": 5,
+      "response_length": 3325,
+      "time_s": 9.029566764831543,
+      "success": true
+    }
+  ]
+}
