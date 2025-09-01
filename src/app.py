@@ -60,8 +60,137 @@ def initialize_indexer(_config, _cache_key):
         st.error(f"❌ Failed to load index: {load_result['error']}")
         return None, load_result
 
-def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: Dict[str, Any]) -> str:
-    """Generate chat response using OpenAI with retrieved context."""
+def get_conversation_context(messages: List[Dict[str, Any]], max_messages: int = 3) -> str:
+    """Extract recent conversation context for better responses."""
+    if len(messages) <= 1:  # Only current message
+        return ""
+    
+    # Get last few message pairs (user + assistant)
+    recent_messages = messages[-(max_messages * 2):]
+    context_parts = []
+    
+    for msg in recent_messages:
+        role = msg["role"]
+        content = msg["content"][:300]  # Limit length
+        if role == "user":
+            context_parts.append(f"User previously asked: {content}")
+        elif role == "assistant":
+            context_parts.append(f"Assistant previously responded: {content}")
+    
+    return "\n".join(context_parts) if context_parts else ""
+
+def extract_document_mentions(query: str) -> List[str]:
+    """Extract specific UN document symbols or titles mentioned in query."""
+    import re
+    
+    # Look for UN document symbols (A/79/123, S/2025/456, etc.)
+    symbol_patterns = [
+        r'\b[A-Z]+/\d+/\d+\b',      # A/79/123
+        r'\b[A-Z]+/\d+\b',          # A/79
+        r'\b[A-Z]/[A-Z\.]+/\d+\b',  # A/AC.109/2025
+        r'\bS/\d+/\d+\b',           # S/2025/123
+        r'\bE/\d+/\d+\b',           # E/2025/123
+    ]
+    
+    mentions = []
+    for pattern in symbol_patterns:
+        matches = re.findall(pattern, query)
+        mentions.extend(matches)
+    
+    # Look for document type mentions
+    doc_keywords = ['this report', 'this document', 'the report', 'that document']
+    for keyword in doc_keywords:
+        if keyword.lower() in query.lower():
+            mentions.append(keyword)
+    
+    return list(set(mentions))
+
+def enhanced_search(indexer, query: str, conversation_history: List[Dict[str, Any]], 
+                   top_k: int = 5, min_threshold: float = 0.3) -> List[Dict[str, Any]]:
+    """Enhanced search that considers conversation context and document focus."""
+    
+    # Extract document mentions and conversation context
+    document_mentions = extract_document_mentions(query)
+    conv_context = get_conversation_context(conversation_history)
+    
+    # Get initial search results
+    initial_results = indexer.search(query, top_k=top_k * 2, min_threshold=min_threshold)
+    
+    # If specific documents are mentioned, filter and prioritize them
+    if document_mentions:
+        logger.info(f"Document mentions detected: {document_mentions}")
+        
+        # Find chunks from mentioned documents
+        focused_results = []
+        other_results = []
+        
+        for result in initial_results:
+            result_symbol = result.get('symbol', '')
+            result_title = result.get('title', '').lower()
+            
+            # Check if this chunk is from a mentioned document
+            is_mentioned = False
+            for mention in document_mentions:
+                if mention.lower() in ['this report', 'this document', 'the report', 'that document']:
+                    # For generic references, check if previous conversation mentioned specific docs
+                    if conv_context:
+                        # Simple heuristic: if conversation context contains document symbols
+                        import re
+                        prev_symbols = re.findall(r'\b[A-Z]+/\d+(?:/\d+)?\b', conv_context)
+                        if any(symbol in result_symbol for symbol in prev_symbols):
+                            is_mentioned = True
+                elif mention.upper() in result_symbol.upper():
+                    is_mentioned = True
+                elif mention.lower() in result_title:
+                    is_mentioned = True
+            
+            if is_mentioned:
+                focused_results.append(result)
+            else:
+                other_results.append(result)
+        
+        # Prioritize mentioned documents, then add others
+        if focused_results:
+            logger.info(f"Found {len(focused_results)} chunks from mentioned documents")
+            # Take more from focused docs, fewer from others
+            final_results = focused_results[:max(3, top_k-2)] + other_results[:2]
+            return final_results[:top_k]
+    
+    # If no specific documents mentioned, use conversation context to enhance search
+    if conv_context:
+        # Extract key terms from conversation for context-aware search
+        # This is a simple approach - in production you'd use more sophisticated NLP
+        import re
+        prev_terms = re.findall(r'\b(?:climate|sustainable|development|peacekeeping|security|economic|social|human rights|gender|humanitarian)\b', conv_context.lower())
+        
+        if prev_terms:
+            logger.info(f"Conversation context terms: {set(prev_terms)}")
+            # Boost results that match conversation themes
+            themed_results = []
+            other_results = []
+            
+            for result in initial_results:
+                result_text = result.get('text', '').lower()
+                if any(term in result_text for term in set(prev_terms)):
+                    themed_results.append(result)
+                else:
+                    other_results.append(result)
+            
+            # Mix themed and other results
+            final_results = []
+            for i in range(top_k):
+                if i < len(themed_results):
+                    final_results.append(themed_results[i])
+                elif (i - len(themed_results)) < len(other_results):
+                    final_results.append(other_results[i - len(themed_results)])
+            
+            return final_results[:top_k]
+    
+    return initial_results[:top_k]
+
+def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: Dict[str, Any], 
+                     conversation_history: List[Dict[str, Any]] = None) -> str:
+    """Generate enhanced chat response with conversational awareness."""
     
     logger.info(f"get_chat_response called with query: {query}")
     logger.info(f"Number of context chunks: {len(context_chunks)}")
@@ -73,6 +202,11 @@ def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: 
         return "❌ OpenAI API key not found. Please set OPENAI_API_KEY environment variable."
     
     logger.info("OpenAI API key found")
+    
+    # Extract conversation context
+    conversation_history = conversation_history or []
+    conv_context = get_conversation_context(conversation_history)
+    document_mentions = extract_document_mentions(query)
     
     # Prepare context from chunks - use adaptive number based on relevance
     # Only include chunks that are actually relevant, up to a maximum of 5
@@ -90,22 +224,51 @@ def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: 
     context = "\n".join(context_parts)
     logger.info(f"Context prepared with {len(context_parts)} relevant chunks ({len(context)} characters)")
     
-    # Create prompt
-    prompt = f"""You are an AI assistant that helps users understand UN reports. Use the provided context to answer the user's question accurately and concisely.
+    # Build enhanced conversational prompt
+    prompt_parts = []
+    
+    # System role and capabilities
+    prompt_parts.append("""You are a knowledgeable UN analyst and conversational AI assistant specialized in United Nations reports and documents. You help users both search for information and have deeper analytical conversations about UN activities, policies, and findings.
 
-IMPORTANT INSTRUCTIONS:
-- Answer based ONLY on the provided context from UN reports
-- Always cite your sources using the format [1], [2], etc.
-- If the context doesn't contain relevant information, say so clearly
-- Be precise and factual
-- Do not make up or hallucinate information
+CORE CAPABILITIES:
+1. **Search Mode**: Help users find specific information across UN documents
+2. **Analysis Mode**: Provide detailed analysis, synthesis, and insights from UN reports  
+3. **Conversation Mode**: Maintain context and have meaningful discussions about UN topics
 
-CONTEXT FROM UN REPORTS:
-{context}
+RESPONSE GUIDELINES:
+- Always cite sources using [1], [2], etc. format
+- Be conversational and engaging, not just factual
+- Connect information across documents when relevant
+- Acknowledge conversation history and build on previous exchanges
+- If focusing on a specific document, prioritize information from that document
+- Provide analysis and insights, not just facts
+- Be precise but also contextual and explanatory""")
 
-USER QUESTION: {query}
+    # Add conversation context if available
+    if conv_context:
+        prompt_parts.append(f"\nCONVERSATION CONTEXT:\n{conv_context}")
+    
+    # Add document focus if mentioned
+    if document_mentions:
+        prompt_parts.append(f"\nUSER MENTIONED DOCUMENTS: {', '.join(document_mentions)}")
+        prompt_parts.append("Focus primarily on these specific documents when answering.")
+    
+    # Add current context
+    prompt_parts.append(f"\nCURRENT UN REPORT CONTEXT:\n{context}")
+    
+    # Add current query with instruction
+    prompt_parts.append(f"\nCURRENT USER QUESTION: {query}")
+    
+    # Final instructions
+    prompt_parts.append("""
+RESPONSE APPROACH:
+1. **Analyze**: Consider the conversation context and specific documents mentioned
+2. **Synthesize**: Draw connections between different sources and previous discussion
+3. **Respond**: Provide a thoughtful, well-cited response that advances the conversation
 
-ANSWER:"""
+Remember: You're not just a search engine - you're a conversational partner helping users understand complex UN topics. Be helpful, insightful, and engaging while staying factual.""")
+    
+    prompt = "\n".join(prompt_parts)
 
     logger.info(f"Prompt length: {len(prompt)} characters")
 
@@ -330,6 +493,13 @@ def main():
             st.success("Cache cleared! The page will refresh...")
             st.rerun()
         
+        if st.button("💬 New Conversation", help="Start a fresh conversation"):
+            st.session_state.messages = []
+            st.session_state.document_focus = None
+            st.session_state.conversation_topic = None
+            st.success("Started new conversation!")
+            st.rerun()
+        
         # Query settings
         st.header("⚙️ Search Settings")
         top_k = st.slider("Max results to retrieve", 1, 20, 5)
@@ -367,9 +537,22 @@ def main():
         st.info("💡 Click 'Rebuild Corpus' in the sidebar to download and index recent UN reports.")
         return
     
-    # Chat history
+    # Initialize session state for conversation management
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    
+    if "document_focus" not in st.session_state:
+        st.session_state.document_focus = None
+    
+    if "conversation_topic" not in st.session_state:
+        st.session_state.conversation_topic = None
+    
+    # Show conversation context if there is one
+    if len(st.session_state.messages) > 0:
+        if st.session_state.document_focus:
+            st.info(f"📋 **Document Focus**: {st.session_state.document_focus}")
+        elif st.session_state.conversation_topic:
+            st.info(f"💭 **Topic**: {st.session_state.conversation_topic}")
     
     # Display chat history
     for message in st.session_state.messages:
@@ -394,11 +577,11 @@ def main():
         # Generate response
         with st.spinner("Searching UN reports..."):
             try:
-                # Search for relevant chunks
+                # Search for relevant chunks using enhanced search
                 min_threshold = st.session_state.get('min_threshold', 0.3)
                 logger.info(f"Searching with top_k={top_k}, threshold={min_threshold}")
-                results = indexer.search(query, top_k=top_k, min_threshold=min_threshold)
-                logger.info(f"Search returned {len(results)} results")
+                results = enhanced_search(indexer, query, st.session_state.messages, top_k=top_k, min_threshold=min_threshold)
+                logger.info(f"Enhanced search returned {len(results)} results")
                 
                 if not results:
                     response = "I couldn't find any relevant information in the UN reports corpus for your query."
@@ -407,11 +590,29 @@ def main():
                 else:
                     # Generate response using retrieved context
                     logger.info("Generating chat response...")
-                    response = get_chat_response(query, results, config)
+                    response = get_chat_response(query, results, config, st.session_state.messages)
                     logger.info(f"Response generated: {response[:100]}...")
                     citation_threshold = st.session_state.get('citation_threshold', 0.4)
                     citations = format_citations(results, citation_threshold, response)
                     logger.info("Citations formatted")
+                    
+                    # Update conversation state based on results
+                    if results:
+                        # Check if user is focusing on a specific document
+                        document_mentions = extract_document_mentions(query)
+                        if document_mentions:
+                            # Extract document symbols from results
+                            doc_symbols = [r.get('symbol', '') for r in results[:2] if r.get('symbol')]
+                            if doc_symbols:
+                                st.session_state.document_focus = doc_symbols[0]
+                        
+                        # Extract topic from query for conversation continuity
+                        topic_keywords = ['climate', 'sustainable development', 'peacekeeping', 'security', 
+                                        'economic', 'social', 'human rights', 'gender', 'humanitarian']
+                        for keyword in topic_keywords:
+                            if keyword in query.lower():
+                                st.session_state.conversation_topic = keyword.title()
+                                break
                 
                 # Display response in chat message
                 with st.chat_message("assistant"):
@@ -440,58 +641,121 @@ def main():
     
     # Example queries
     if len(st.session_state.messages) == 0:
-        st.markdown("### 💡 Try asking about:")
-        example_queries = [
-            "What information on decolonization has been reported?",
-            "Show me Statistical Commission reports from 2025",
-            "What did ESCAP report in their annual report?",
-            "Recent Economic Commission reports and findings",
-            "What peacekeeping activities are mentioned in recent reports?",
-            "Technology and innovation developments in 2025"
-        ]
+        st.markdown("### 💡 Try these conversational examples:")
         
-        for example_query in example_queries:
-            if st.button(f"💬 {example_query}", key=f"example_{example_query[:20]}"):
-                # Process the query immediately
-                logger.info(f"Processing example query: {example_query}")
-                
-                # Add user message to history
-                st.session_state.messages.append({"role": "user", "content": example_query})
-                
-                # Generate response
-                with st.spinner("Searching UN reports..."):
-                    try:
-                        # Search for relevant chunks
-                        search_top_k = st.session_state.get('top_k', 5)
-                        search_threshold = st.session_state.get('min_threshold', 0.3)
-                        logger.info(f"Searching with top_k={search_top_k}, threshold={search_threshold}")
-                        results = indexer.search(example_query, top_k=search_top_k, min_threshold=search_threshold)
-                        logger.info(f"Search returned {len(results)} results")
-                        
-                        if not results:
-                            response = "I couldn't find any relevant information in the UN reports corpus for your query."
-                            citations = ""
-                        else:
-                            # Generate response using retrieved context
-                            logger.info("Generating chat response...")
-                            response = get_chat_response(example_query, results, config)
-                            logger.info(f"Response generated: {response[:100]}...")
-                            citation_threshold = st.session_state.get('citation_threshold', 0.4)
-                            citations = format_citations(results, citation_threshold, response)
-                        
-                        # Add assistant response to history
-                        st.session_state.messages.append({
-                            "role": "assistant", 
-                            "content": response,
-                            "citations": citations
-                        })
-                        
-                        # Rerun to display the messages
-                        st.rerun()
-                        
-                    except Exception as e:
-                        logger.error(f"Error processing example query: {e}")
-                        st.error(f"❌ An error occurred: {str(e)}")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**🔍 Search Mode:**")
+            search_queries = [
+                "What recent reports discuss climate change?",
+                "Show me Statistical Commission reports from 2025",
+                "Find reports about sustainable development goals"
+            ]
+            
+            for query in search_queries:
+                if st.button(f"💬 {query}", key=f"search_{query[:15]}"):
+                    # Add user message and process immediately
+                    st.session_state.messages.append({"role": "user", "content": query})
+                    
+                    # Process the query immediately using the same logic as chat input
+                    with st.spinner("Searching UN reports..."):
+                        try:
+                            min_threshold = st.session_state.get('min_threshold', 0.3)
+                            top_k = st.session_state.get('top_k', 5)
+                            results = enhanced_search(indexer, query, st.session_state.messages, top_k=top_k, min_threshold=min_threshold)
+                            
+                            if not results:
+                                response = "I couldn't find any relevant information in the UN reports corpus for your query."
+                                citations = ""
+                            else:
+                                response = get_chat_response(query, results, config, st.session_state.messages)
+                                citation_threshold = st.session_state.get('citation_threshold', 0.4)
+                                citations = format_citations(results, citation_threshold, response)
+                                
+                                # Update conversation state
+                                document_mentions = extract_document_mentions(query)
+                                if document_mentions and results:
+                                    doc_symbols = [r.get('symbol', '') for r in results[:2] if r.get('symbol')]
+                                    if doc_symbols:
+                                        st.session_state.document_focus = doc_symbols[0]
+                            
+                            # Add assistant response
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": response,
+                                "citations": citations
+                            })
+                            
+                        except Exception as e:
+                            logger.error(f"Error processing search query: {e}")
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": f"❌ An error occurred: {str(e)}",
+                                "citations": ""
+                            })
+                    
+                    st.rerun()
+        
+        with col2:
+            st.markdown("**💭 Conversation Mode:**")
+            conversation_starters = [
+                "Tell me about the latest technology and innovation report",
+                "What are the main challenges in peacekeeping in recent reports?", 
+                "Help me understand the economic situation discussed in UN reports"
+            ]
+            
+            for query in conversation_starters:
+                if st.button(f"💬 {query}", key=f"conv_{query[:15]}"):
+                    # Add user message and process immediately
+                    st.session_state.messages.append({"role": "user", "content": query})
+                    
+                    # Process the query immediately
+                    with st.spinner("Searching UN reports..."):
+                        try:
+                            min_threshold = st.session_state.get('min_threshold', 0.3)
+                            top_k = st.session_state.get('top_k', 5)
+                            results = enhanced_search(indexer, query, st.session_state.messages, top_k=top_k, min_threshold=min_threshold)
+                            
+                            if not results:
+                                response = "I couldn't find any relevant information in the UN reports corpus for your query."
+                                citations = ""
+                            else:
+                                response = get_chat_response(query, results, config, st.session_state.messages)
+                                citation_threshold = st.session_state.get('citation_threshold', 0.4)
+                                citations = format_citations(results, citation_threshold, response)
+                                
+                                # Update conversation state
+                                topic_keywords = ['climate', 'sustainable development', 'peacekeeping', 'security', 
+                                                'economic', 'social', 'human rights', 'gender', 'humanitarian']
+                                for keyword in topic_keywords:
+                                    if keyword in query.lower():
+                                        st.session_state.conversation_topic = keyword.title()
+                                        break
+                            
+                            # Add assistant response
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": response,
+                                "citations": citations
+                            })
+                            
+                        except Exception as e:
+                            logger.error(f"Error processing conversation query: {e}")
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": f"❌ An error occurred: {str(e)}",
+                                "citations": ""
+                            })
+                    
+                    st.rerun()
+        
+        st.markdown("""
+        **💡 Pro Tips:**
+        - Ask follow-up questions like "What does this report say about..." 
+        - Reference specific documents: "In report A/79/123, what..."
+        - Build conversations: "How does this compare to previous years?"
+        """)
 
 if __name__ == "__main__":
     main()
