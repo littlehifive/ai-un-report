@@ -244,13 +244,25 @@ def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: 
     conv_context = get_conversation_context(conversation_history)
     document_mentions = extract_document_mentions(query)
     
+    # CRITICAL: Check if we have any meaningful context at all
+    if not context_chunks:
+        logger.warning("No context chunks provided - returning no information found message")
+        return "I cannot find relevant information about this topic in the available UN documents."
+    
     # Prepare context from chunks - use adaptive number based on relevance
     # Only include chunks that are actually relevant, up to a maximum of 5
     context_parts = []
     max_chunks_for_context = min(5, len(context_chunks))  # Use up to 5, but only if they exist
     
-    for i, chunk in enumerate(context_chunks[:max_chunks_for_context], 1):
-        # Optional: Add additional relevance check here if needed
+    # Filter out very low relevance chunks to prevent hallucination
+    MINIMUM_RELEVANCE = 0.3  # Only include chunks with at least 30% relevance
+    relevant_chunks = [chunk for chunk in context_chunks if chunk.get('similarity_score', 0) >= MINIMUM_RELEVANCE]
+    
+    if not relevant_chunks:
+        logger.warning(f"No chunks above minimum relevance threshold {MINIMUM_RELEVANCE} - returning no information found message")
+        return "I cannot find relevant information about this topic in the available UN documents."
+    
+    for i, chunk in enumerate(relevant_chunks[:max_chunks_for_context], 1):
         score = chunk.get('similarity_score', 0)
         logger.info(f"Including chunk {i} with similarity score: {score:.3f}")
         
@@ -263,29 +275,23 @@ def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: 
     # Build enhanced conversational prompt
     prompt_parts = []
     
-    # System role and capabilities
-    prompt_parts.append("""You are a knowledgeable UN analyst and conversational AI assistant specialized in United Nations reports and documents. You help users both search for information and have deeper analytical conversations about UN activities, policies, and findings.
+    # System role and capabilities - STRICT ANTI-HALLUCINATION VERSION
+    prompt_parts.append("""You are a UN document search assistant. Your ONLY job is to answer questions using the provided UN document context.
 
-CORE CAPABILITIES:
-1. **Search Mode**: Help users find specific information across UN documents
-2. **Analysis Mode**: Provide detailed analysis, synthesis, and insights from UN reports  
-3. **Conversation Mode**: Maintain context and have meaningful discussions about UN topics
+CRITICAL RULES - NEVER VIOLATE THESE:
+1. **ONLY** answer using information from the provided UN document context
+2. **NEVER** provide information about UN reports, committees, or documents that are not in the provided context
+3. **NEVER** mention specific UN document numbers, committee names, or report details unless they appear in the provided context
+4. **NEVER** use general knowledge about the UN - ONLY use the provided context
+5. If the provided context is insufficient to answer the question, you MUST say "I cannot find relevant information about this topic in the available UN documents"
 
-CRITICAL CITATION RULES:
-- ONLY cite sources [1], [2], etc. if the information comes directly from the provided context
-- NEVER make up or hallucinate citations
-- If providing general analysis or opinion not found in the context, do NOT use citations
-- When uncertain about specific facts, clearly indicate uncertainty
-- If no relevant context is provided, acknowledge this and provide general knowledge without citations
+RESPONSE APPROACH:
+- IF the context contains relevant information: Answer using ONLY that information with proper citations [1], [2], etc.
+- IF the context does not contain relevant information: Say "I cannot find relevant information about this topic in the available UN documents" and DO NOT provide any other information
+- NEVER invent or hallucinate UN report names, committee names, document symbols, or specific UN activities
+- NEVER provide "general knowledge" about the UN - stick strictly to the provided context
 
-RESPONSE GUIDELINES:
-- Be conversational and engaging, not just factual
-- Connect information across documents when relevant
-- Acknowledge conversation history and build on previous exchanges
-- If focusing on a specific document, prioritize information from that document
-- Provide analysis and insights, not just facts
-- Be precise but also contextual and explanatory
-- Distinguish between information from provided sources vs. general knowledge""")
+You are NOT a general UN expert - you are ONLY a search tool for the specific documents provided in the context.""")
 
     # Add conversation context if available
     if conv_context:
@@ -304,12 +310,13 @@ RESPONSE GUIDELINES:
     
     # Final instructions
     prompt_parts.append("""
-RESPONSE APPROACH:
-1. **Analyze**: Consider the conversation context and specific documents mentioned
-2. **Synthesize**: Draw connections between different sources and previous discussion
-3. **Respond**: Provide a thoughtful, well-cited response that advances the conversation
+FINAL REMINDER:
+- Check if the provided context actually contains information to answer the question
+- If YES: Answer using ONLY the context information with proper citations
+- If NO: Respond ONLY with "I cannot find relevant information about this topic in the available UN documents"
+- NEVER provide information not found in the context, even if you know it from general knowledge
 
-Remember: You're not just a search engine - you're a conversational partner helping users understand complex UN topics. Be helpful, insightful, and engaging while staying factual.""")
+Your role is strictly limited to searching the provided UN document context.""")
     
     prompt = "\n".join(prompt_parts)
 
@@ -334,8 +341,39 @@ Remember: You're not just a search engine - you're a conversational partner help
         answer = response.choices[0].message.content
         logger.info(f"OpenAI response received, length: {len(answer)} characters")
         
+        # CRITICAL: Additional validation to prevent hallucinations
+        # If the response contains specific UN information but says no information found, it's hallucinating
+        answer_lower = answer.lower()
+        
+        # Check for hallucination indicators - specific UN terms that suggest invented information
+        hallucination_indicators = [
+            'committee of experts',
+            'economic commission',
+            'ecosoc',
+            'general assembly resolution',
+            'security council resolution',
+            'un document',
+            'un report',
+            'secretary-general',
+            'special rapporteur'
+        ]
+        
+        # If response says "cannot find" but also mentions specific UN entities, it's hallucinating
+        # BUT exclude the standard "cannot find relevant information about this topic in the available UN documents" message
+        standard_no_info_message = "i cannot find relevant information about this topic in the available un documents"
+        if ('cannot find' in answer_lower or 'no information' in answer_lower) and answer_lower.strip() != standard_no_info_message:
+            for indicator in hallucination_indicators:
+                if indicator in answer_lower and answer_lower.strip() != standard_no_info_message:
+                    logger.error(f"HALLUCINATION DETECTED: Response claims no info but mentions '{indicator}'")
+                    return "I cannot find relevant information about this topic in the available UN documents."
+        
+        # Additional check: if response is very long but context was limited, might be hallucinating
+        if len(answer) > 1000 and len(relevant_chunks) < 2:
+            logger.warning("Long response with limited context - potential hallucination")
+            # Let it pass but validate citations more strictly
+        
         # Validate citations to prevent hallucinations
-        validated_answer = validate_citations(answer, context_chunks)
+        validated_answer = validate_citations(answer, relevant_chunks)  # Use relevant_chunks, not all context_chunks
         if validated_answer != answer:
             logger.warning("Citation validation removed hallucinated citations")
         
@@ -352,49 +390,38 @@ def format_citations(chunks: List[Dict[str, Any]], citation_threshold: float = 0
     if not chunks:
         return ""
     
-    # Check if the response indicates no relevant information was found
-    no_info_indicators = [
-        "no specific information",
-        "doesn't contain relevant information",
-        "couldn't find any relevant",
-        "no relevant information",
-        "context doesn't contain",
-        "unable to find specific"
-    ]
+    # CRITICAL: Check if the response indicates no information was found using our standard message
+    response_lower = response_text.lower().strip()
+    standard_no_info_message = "i cannot find relevant information about this topic in the available un documents."
     
-    response_lower = response_text.lower()
-    indicates_no_relevant_info = any(indicator in response_lower for indicator in no_info_indicators)
+    # If the response is our standard "no information found" message, show no citations
+    if response_lower == standard_no_info_message:
+        return "No sufficiently relevant sources found for this query."
     
-    # Filter chunks to only show those above citation threshold
-    # This allows showing only highly relevant citations even if we used more chunks for context
-    relevant_chunks = []
-    for chunk in chunks:
-        score = chunk.get('similarity_score', 0)
-        if score >= citation_threshold:
-            relevant_chunks.append(chunk)
+    # For responses that contain actual information, show citations
+    # Use the same threshold logic as get_chat_response (0.3 minimum)
+    MINIMUM_RELEVANCE = 0.3  # Match the threshold in get_chat_response
+    relevant_chunks = [chunk for chunk in chunks if chunk.get('similarity_score', 0) >= MINIMUM_RELEVANCE]
     
-    # If response indicates no relevant info, be more selective with citations
-    if indicates_no_relevant_info:
-        # Use a higher threshold when no relevant information was found
-        higher_threshold = max(citation_threshold + 0.2, 0.6)
-        very_relevant_chunks = [c for c in relevant_chunks if c.get('similarity_score', 0) >= higher_threshold]
-        
-        if not very_relevant_chunks:
-            return "⚠️ **Note:** The search returned some results, but they don't appear to be directly relevant to your query. The similarity scores were too low to provide meaningful citations."
-        
-        # Show only 1-2 most relevant if response says no info
-        relevant_chunks = very_relevant_chunks[:2]
-        prefix = "⚠️ **Note:** Limited relevant sources found. These are the closest matches:\n\n"
+    if not relevant_chunks:
+        return "No sufficiently relevant sources found for this query."
+    
+    # Apply citation threshold on top of minimum relevance
+    citation_worthy_chunks = [chunk for chunk in relevant_chunks if chunk.get('similarity_score', 0) >= citation_threshold]
+    
+    if not citation_worthy_chunks:
+        # If no chunks meet citation threshold but some met minimum relevance, show the best ones
+        # This handles cases where content was used for response but similarity scores are borderline
+        citation_worthy_chunks = sorted(relevant_chunks, key=lambda x: x.get('similarity_score', 0), reverse=True)[:3]
+        prefix = "⚠️ **Note:** These sources have lower similarity scores but were used to generate the response:\n\n"
     else:
-        if not relevant_chunks:
-            return "No sufficiently relevant sources found for this query."
         prefix = ""
     
     # Limit to maximum of 5 citations even if more are relevant
-    max_citations = min(5, len(relevant_chunks))
+    max_citations = min(5, len(citation_worthy_chunks))
     
     citations = []
-    for i, chunk in enumerate(relevant_chunks[:max_citations], 1):
+    for i, chunk in enumerate(citation_worthy_chunks[:max_citations], 1):
         title = chunk.get('title', 'Untitled')
         symbol = chunk.get('symbol', 'Unknown')
         date = chunk.get('date', 'Unknown date')
@@ -415,7 +442,7 @@ def format_citations(chunks: List[Dict[str, Any]], citation_threshold: float = 0
 """
         citations.append(citation)
     
-    logger.info(f"Showing {len(citations)} citations from {len(chunks)} results (threshold: {citation_threshold}, no_info: {indicates_no_relevant_info})")
+    logger.info(f"Showing {len(citations)} citations from {len(chunks)} results (threshold: {citation_threshold})")
     return prefix + "\n".join(citations)
 
 def rebuild_corpus():
