@@ -1,0 +1,256 @@
+{
+  "summary": {
+    "timestamp": "2025-09-01T00:18:37.199651",
+    "total_queries": 7,
+    "successful_queries": 5,
+    "success_rate": 0.7142857142857143,
+    "avg_response_time_ms": 5524.416855403355,
+    "retrieval_success_rate": 0.7142857142857143,
+    "avg_documents_retrieved": 4.571428571428571,
+    "citation_issues": 0,
+    "avg_keyword_overlap": 0.9642857142857143
+  },
+  "detailed_results": [
+    {
+      "question": "What recent reports discuss climate change impacts?",
+      "answer": "Several recent UN reports address the impacts of climate change, highlighting various dimensions such as governance, infrastructure resilience, and humanitarian action. Here are some key insights from...",
+      "query_type": "search",
+      "response_time_ms": 6624.633073806763,
+      "retrieval": {
+        "retrieved_count": 5,
+        "expected_results": true,
+        "retrieval_success": true,
+        "avg_similarity": 0.34739125370979307,
+        "min_similarity": 0.3283969461917877,
+        "max_similarity": 0.38826268911361694,
+        "document_diversity": 5
+      },
+      "quality": {
+        "length_score": 1.0,
+        "citation_count": 0,
+        "semantic_similarity": 0.27976438163409095,
+        "has_error": false
+      },
+      "keyword_overlap": 0.75,
+      "citation_issues": false,
+      "success": true
+    },
+    {
+      "question": "Show me Statistical Commission reports from 2025",
+      "answer": "The Statistical Commission report from 2025 is documented in the **Report on the fifty-sixth session** (E/2025/24, E/CN.3/2025/37). This session took place from March 4 to March 7, 2025, and is part o...",
+      "query_type": "search",
+      "response_time_ms": 3602.283000946045,
+      "retrieval": {
+        "retrieved_count": 5,
+        "expected_results": true,
+        "retrieval_success": true,
+        "avg_similarity": 0.5099628925323486,
+        "min_similarity": 0.46655192971229553,
+        "max_similarity": 0.5777608156204224,
+        "document_diversity": 5
+      },
+      "quality": {
+        "length_score": 1.0,
+        "citation_count": 0,
+        "semantic_similarity": 0.23184483665071584,
+        "has_error": false
+      },
+      "keyword_overlap": 1.0,
+      "citation_issues": false,
+      "success": true
+    },
+    {
+      "question": "What does the Technology and Innovation Report 2025 say about AI?",
+      "answer": "The **Technology and Innovation Report 2025** focuses on the transformative potential of artificial intelligence (AI) and its implications for development, particularly in fostering inclusive growth a...",
+      "query_type": "document_specific",
+      "response_time_ms": 6529.547929763794,
+      "retrieval": {
+        "retrieved_count": 2,
+        "expected_results": true,
+        "retrieval_success": true,
+        "avg_similarity": 0.6817170679569244,
+        "min_similarity": 0.677603006362915,
+        "max_similarity": 0.6858311295509338,
+        "document_diversity": 2
+      },
+      "quality": {
+        "length_score": 1.0,
+        "citation_count": 0,
+        "semantic_similarity": 0.3549074652954178,
+        "has_error": false
+      },
+      "keyword_overlap": 1.0,
+      "citation_issues": false,
+      "success": true
+    },
+    {
+      "question": "What are the main challenges in peacekeeping mentioned in recent reports?",
+      "answer": "Recent reports highlight several significant challenges in peacekeeping operations, particularly as outlined in the draft report from the Special Committee on Peacekeeping Operations and other relevan...",
+      "query_type": "analytical",
+      "response_time_ms": 6059.118747711182,
+      "retrieval": {
+        "retrieved_count": 5,
+        "expected_results": true,
+        "retrieval_success": true,
+        "avg_similarity": 0.46080213189125063,
+        "min_similarity": 0.4498671293258667,
+        "max_similarity": 0.47013506293296814,
+        "document_diversity": 5
+      },
+      "quality": {
+        "length_score": 1.0,
+        "citation_count": 5,
+        "semantic_similarity": 0.22141488612095533,
+        "has_error": false
+      },
+      "keyword_overlap": 1.0,
+      "citation_issues": false,
+      "success": true
+    },
+    {
+      "question": "How do recent economic reports assess global recovery?",
+      "answer": "Recent economic reports from the United Nations highlight a complex landscape for global recovery, particularly in the context of ongoing challenges such as geopolitical tensions, climate change, and ...",
+      "query_type": "analytical",
+      "response_time_ms": 5523.9012241363525,
+      "retrieval": {
+        "retrieved_count": 5,
+        "expected_results": true,
+        "retrieval_success": true,
+        "avg_similarity": 0.36903469562530516,
+        "min_similarity": 0.34701740741729736,
+        "max_similarity": 0.394677072763443,
+        "document_diversity": 5
+      },
+      "quality": {
+        "length_score": 1.0,
+        "citation_count": 5,
+        "semantic_similarity": 0.2336930864630156,
+        "has_error": false
+      },
+      "keyword_overlap": 1.0,
+      "citation_issues": false,
+      "success": true
+    },
+    {
+      "question": "What is the point of UN reports?",
+      "answer": "UN reports serve several critical purposes that are essential for the functioning of the organization and its member states. Here are some key points regarding their significance:\n\n1. **Documentation ...",
+      "query_type": "general",
+      "response_time_ms": 6566.480875015259,
+      "retrieval": {
+        "retrieved_count": 5,
+        "expected_results": false,
+        "retrieval_success": false,
+        "avg_similarity": 0.475764399766922,
+        "min_similarity": 0.4612458050251007,
+        "max_similarity": 0.48379528522491455,
+        "document_diversity": 5
+      },
+      "quality": {
+        "length_score": 1.0,
+        "citation_count": 8,
+        "semantic_similarity": 0.216988759609508,
+        "has_error": false
+      },
+      "keyword_overlap": 1.0,
+      "citation_issues": false,
+      "success": false
+    },
+    {
+      "question": "Tell me about lunar colonization in UN reports",
+      "answer": "Lunar colonization, while a fascinating topic, does not appear to be directly addressed in the current UN reports you provided. The focus of these documents is primarily on decolonization efforts, dev...",
+      "query_type": "irrelevant",
+      "response_time_ms": 3764.953136444092,
+      "retrieval": {
+        "retrieved_count": 5,
+        "expected_results": false,
+        "retrieval_success": false,
+        "avg_similarity": 0.4014370679855347,
+        "min_similarity": 0.39040887355804443,
+        "max_similarity": 0.4286712408065796,
+        "document_diversity": 5
+      },
+      "quality": {
+        "length_score": 1.0,
+        "citation_count": 0,
+        "semantic_similarity": 0.25119011111985856,
+        "has_error": false
+      },
+      "keyword_overlap": 1.0,
+      "citation_issues": false,
+      "success": false
+    }
+  ],
+  "test_cases": [
+    {
+      "question": "What recent reports discuss climate change impacts?",
+      "expected_keywords": [
+        "climate",
+        "change",
+        "impacts",
+        "environment"
+      ],
+      "query_type": "search",
+      "expect_results": true
+    },
+    {
+      "question": "Show me Statistical Commission reports from 2025",
+      "expected_keywords": [
+        "statistical",
+        "commission",
+        "2025"
+      ],
+      "query_type": "search",
+      "expect_results": true
+    },
+    {
+      "question": "What does the Technology and Innovation Report 2025 say about AI?",
+      "expected_keywords": [
+        "technology",
+        "innovation",
+        "artificial",
+        "intelligence"
+      ],
+      "query_type": "document_specific",
+      "expect_results": true
+    },
+    {
+      "question": "What are the main challenges in peacekeeping mentioned in recent reports?",
+      "expected_keywords": [
+        "peacekeeping",
+        "challenges",
+        "security"
+      ],
+      "query_type": "analytical",
+      "expect_results": true
+    },
+    {
+      "question": "How do recent economic reports assess global recovery?",
+      "expected_keywords": [
+        "economic",
+        "recovery",
+        "global"
+      ],
+      "query_type": "analytical",
+      "expect_results": true
+    },
+    {
+      "question": "What is the point of UN reports?",
+      "expected_keywords": [
+        "transparency",
+        "accountability",
+        "purpose"
+      ],
+      "query_type": "general",
+      "expect_results": false
+    },
+    {
+      "question": "Tell me about lunar colonization in UN reports",
+      "expected_keywords": [
+        "lunar",
+        "colonization"
+      ],
+      "query_type": "irrelevant",
+      "expect_results": false
+    }
+  ]
+}
