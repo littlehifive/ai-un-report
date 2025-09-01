@@ -61,10 +61,21 @@ def initialize_indexer(_config, _cache_key):
     load_result = indexer.load_index()
     
     if load_result['success']:
-        st.success(f"✅ Index loaded: {load_result['total_chunks']} chunks from {load_result.get('index_date', 'unknown date')}")
+        # Get a user-friendly date
+        created_date = load_result.get('created_at', '')
+        if created_date:
+            try:
+                date_obj = datetime.fromisoformat(created_date.replace('Z', '+00:00'))
+                friendly_date = date_obj.strftime("%B %d, %Y")
+            except:
+                friendly_date = "recently"
+        else:
+            friendly_date = "recently"
+            
+        st.success(f"✅ Ready to search {load_result['total_chunks']} UN document sections (last updated {friendly_date})")
         return indexer, load_result
     else:
-        st.error(f"❌ Failed to load index: {load_result['error']}")
+        st.error(f"❌ Unable to load UN documents: {load_result['error']}")
         return None, load_result
 
 def get_conversation_context(messages: List[Dict[str, Any]], max_messages: int = 3) -> str:
@@ -282,8 +293,8 @@ def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: 
     # Build enhanced conversational prompt
     prompt_parts = []
     
-    # System role and capabilities - STRICT ANTI-HALLUCINATION VERSION
-    prompt_parts.append("""You are a UN document search assistant. Your ONLY job is to answer questions using the provided UN document context.
+    # System role and capabilities - WITH FOLLOW-UP QUESTIONS
+    prompt_parts.append("""You are a helpful UN Reports Assistant. Your job is to answer questions using the provided UN document context and encourage further exploration.
 
 CRITICAL RULES - NEVER VIOLATE THESE:
 1. **ONLY** answer using information from the provided UN document context
@@ -292,13 +303,21 @@ CRITICAL RULES - NEVER VIOLATE THESE:
 4. **NEVER** use general knowledge about the UN - ONLY use the provided context
 5. If the provided context is insufficient to answer the question, you MUST say "I cannot find relevant information about this topic in the available UN documents"
 
-RESPONSE APPROACH:
-- IF the context contains relevant information: Answer using ONLY that information with proper citations [1], [2], etc.
-- IF the context does not contain relevant information: Say "I cannot find relevant information about this topic in the available UN documents" and DO NOT provide any other information
-- NEVER invent or hallucinate UN report names, committee names, document symbols, or specific UN activities
-- NEVER provide "general knowledge" about the UN - stick strictly to the provided context
+RESPONSE STRUCTURE:
+1. **Answer the question** using ONLY the provided context with proper citations [1], [2], etc.
+2. **Add a follow-up question** to encourage deeper exploration of the topic
 
-You are NOT a general UN expert - you are ONLY a search tool for the specific documents provided in the context.""")
+FOLLOW-UP QUESTION GUIDELINES:
+- Suggest related questions based on the content you just provided
+- Encourage users to explore specific aspects, time periods, or related topics
+- Make the follow-up questions actionable and interesting
+- Examples of good follow-ups:
+  * "Would you like to know more about [specific aspect mentioned]?"
+  * "I can also tell you about [related topic] - would that interest you?"
+  * "What about [specific question about implementation/outcomes/challenges]?"
+  * "Are you curious about how this compares to [related area]?"
+
+Remember: You are both a search assistant AND a conversation facilitator helping users discover more insights from UN reports.""")
 
     # Add conversation context if available
     if conv_context:
@@ -319,11 +338,11 @@ You are NOT a general UN expert - you are ONLY a search tool for the specific do
     prompt_parts.append("""
 FINAL REMINDER:
 - Check if the provided context actually contains information to answer the question
-- If YES: Answer using ONLY the context information with proper citations
+- If YES: Answer using ONLY the context information with proper citations, then add a follow-up question
 - If NO: Respond ONLY with "I cannot find relevant information about this topic in the available UN documents"
 - NEVER provide information not found in the context, even if you know it from general knowledge
 
-Your role is strictly limited to searching the provided UN document context.""")
+EVERY successful response should end with a friendly follow-up question to keep the conversation going and help users explore related topics!""")
     
     prompt = "\n".join(prompt_parts)
 
@@ -525,8 +544,8 @@ def main():
     """Main Streamlit application."""
     
     # Title and description
-    st.title("🇺🇳 UN Reports RAG Chat")
-    st.markdown("Ask questions about recent UN reports and get answers with citations.")
+    st.title("🇺🇳 UN Reports Assistant")
+    st.markdown("💬 Ask me anything about UN reports from 2025. I'll search through a list of official documents to give you accurate, cited answers.")
     
     # Load configuration
     config = load_app_config()
@@ -537,63 +556,84 @@ def main():
     
     # Sidebar
     with st.sidebar:
-        st.header("📊 Corpus Status")
+        st.header("📚 Knowledge Base")
         
         if indexer:
             stats = indexer.get_index_stats()
-            
-            # Show cache status for debugging
-            st.caption(f"🔑 Cache key: `{cache_key[:20]}...`")
             
             # Calculate accurate document and chunk counts
             if hasattr(indexer, 'chunk_metadata') and indexer.chunk_metadata:
                 # Count unique documents by symbol (most reliable identifier)
                 doc_count = len(set(chunk.get('symbol', '') for chunk in indexer.chunk_metadata if chunk.get('symbol')))
                 chunk_count = len(indexer.chunk_metadata)
-                
-                # File count removed to avoid confusion since 181 files != 52 documents
             else:
                 doc_count = 0 
                 chunk_count = 0
-                
-            st.metric("UN Documents", doc_count)
-            st.metric("Content Chunks", chunk_count)
-            st.metric("Embedding Provider", stats.get('embedding_provider', 'Unknown'))
+            
+            # Show user-friendly information
+            st.info(f"""
+            **📄 {doc_count} UN Reports**  
+            From 2025 across all UN bodies
+            
+            **🔍 {chunk_count} Searchable Sections**  
+            Each report is divided into sections for better search
+            """)
             
             if stats.get('created_at'):
-                created_date = datetime.fromisoformat(stats['created_at'].replace('Z', '+00:00'))
-                st.metric("Last Updated", created_date.strftime("%Y-%m-%d"))
+                try:
+                    created_date = datetime.fromisoformat(stats['created_at'].replace('Z', '+00:00'))
+                    friendly_date = created_date.strftime("%B %d, %Y")
+                    st.caption(f"📅 Last updated: {friendly_date}")
+                except:
+                    st.caption("📅 Recently updated")
+                    
+            # Show what types of reports are available
+            st.markdown("**📋 Report Types:**")
+            st.markdown("""
+            • Security Council resolutions & reports
+            • General Assembly documents  
+            • Economic & Social Council reports
+            • Secretary-General reports
+            • Human Rights Council findings
+            • Development program updates
+            """)
+            
         else:
-            st.warning("Index not available")
+            st.warning("❌ Knowledge base not available")
         
         st.markdown("---")
         
-        # Corpus controls
-        st.header("🔧 Controls")
+        # Simple controls section
+        st.header("🛠 Options")
         
-        if st.button("🔄 Rebuild Corpus", help="Discover, fetch, parse, and index recent UN reports"):
-            if rebuild_corpus():
-                st.rerun()  # Refresh the app after rebuild
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💬 New Chat", help="Start a fresh conversation"):
+                st.session_state.messages = []
+                st.session_state.document_focus = None
+                st.session_state.conversation_topic = None
+                st.success("New conversation started!")
+                st.rerun()
         
-        if st.button("🧹 Clear Cache", help="Clear cached data and reload index"):
-            st.cache_resource.clear()
-            st.success("Cache cleared! The page will refresh...")
-            st.rerun()
+        with col2:
+            if st.button("🔄 Refresh", help="Reload the knowledge base"):
+                st.cache_resource.clear()
+                st.success("Refreshed!")
+                st.rerun()
         
-        if st.button("💬 New Conversation", help="Start a fresh conversation"):
-            st.session_state.messages = []
-            st.session_state.document_focus = None
-            st.session_state.conversation_topic = None
-            st.success("Started new conversation!")
-            st.rerun()
+        # Advanced settings (collapsed by default)
+        with st.expander("⚙️ Advanced Search Settings"):
+            top_k = st.slider("Number of sources to search", 3, 15, 5,
+                            help="How many document sections to consider when answering")
+            min_threshold = st.slider("Search precision", 0.0, 1.0, 0.3, step=0.05,
+                                    help="Higher values = more precise but fewer results")
+            citation_threshold = st.slider("Citation quality", 0.0, 1.0, 0.4, step=0.05,
+                                        help="Higher values = show only the most relevant sources")
         
-        # Query settings
-        st.header("⚙️ Search Settings")
-        top_k = st.slider("Max results to retrieve", 1, 20, 5)
-        min_threshold = st.slider("Minimum relevance threshold", 0.0, 1.0, 0.3, step=0.05, 
-                                help="Lower values show more results, higher values show only highly relevant results")
-        citation_threshold = st.slider("Citation relevance threshold", 0.0, 1.0, 0.4, step=0.05,
-                                help="Only show citations with relevance above this threshold (higher = fewer but more relevant citations)")
+        # Admin controls (only show if rebuild is needed)
+        if not REBUILD_AVAILABLE:
+            st.markdown("---")
+            st.caption("🔧 System administrators can rebuild the knowledge base to include newer reports")
         
         # Store settings in session state for access outside sidebar
         st.session_state.top_k = top_k
@@ -620,8 +660,8 @@ def main():
     
     # Main chat interface
     if not indexer:
-        st.error("❌ Search index not available. Please rebuild the corpus using the sidebar.")
-        st.info("💡 Click 'Rebuild Corpus' in the sidebar to download and index recent UN reports.")
+        st.error("❌ Unable to access UN documents database.")
+        st.info("💡 Please contact your system administrator to restore access to the UN reports collection.")
         return
     
     # Initialize session state for conversation management
@@ -651,8 +691,17 @@ def main():
                 with st.expander("📚 Sources"):
                     st.markdown(message["citations"])
     
-    # Chat input
-    if query := st.chat_input("Ask about UN reports..."):
+    
+    # Handle sample query
+    sample_query = st.session_state.get('sample_query')
+    if sample_query:
+        query = sample_query
+        st.session_state.sample_query = None  # Clear it
+    else:
+        query = st.chat_input("Ask me about UN reports from 2025...")
+
+    # Process query
+    if query:
         logger.info(f"User query received: {query}")
         
         # Add user message
@@ -671,11 +720,23 @@ def main():
                 logger.info(f"Enhanced search returned {len(results)} results")
                 
                 if not results:
-                    # For questions that might be general/analytical, provide helpful response
-                    if any(word in query.lower() for word in ['what is', 'why', 'how', 'purpose', 'point', 'benefit']):
-                        response = f"I don't have specific information from recent UN reports that directly addresses your question about '{query}'. For general questions about UN processes and purposes, I can provide context, but it would be based on general knowledge rather than specific recent reports in my knowledge base."
-                    else:
-                        response = "I couldn't find any relevant information in the UN reports corpus for your query."
+                    # Provide helpful suggestions when no results found
+                    response = f"""I couldn't find specific information about "{query}" in the 2025 UN reports I have access to.
+
+**Try asking about:**
+• Recent Security Council resolutions
+• Secretary-General reports on specific topics
+• Economic and Social Council recommendations  
+• General Assembly proceedings
+• Human Rights Council findings
+• Development program updates
+
+**Example questions:**
+• "What did the Secretary-General report on climate action?"
+• "What peacekeeping challenges were discussed in 2025?"
+• "How do UN reports address sustainable development?"
+
+Feel free to rephrase your question or ask about a different topic!"""
                     citations = ""
                     logger.info("No search results found")
                 else:
