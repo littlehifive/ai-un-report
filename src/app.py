@@ -13,15 +13,22 @@ import json
 import sys
 sys.path.append(str(Path(__file__).parent))
 
-from utils import load_config, load_openai_key, setup_logging
-from index_improved import RateLimitedUNReportIndexer as UNReportIndexer
-from discover import UNReportDiscoverer
-from fetch import UNReportFetcher
-from parse import UNReportParser
-
 # Configure logging for Streamlit
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+from utils import load_config, load_openai_key, setup_logging
+from index_improved import RateLimitedUNReportIndexer as UNReportIndexer
+
+# Optional imports for corpus rebuilding (not needed for normal usage)
+try:
+    from discover_improved import UNReportDiscoverer
+    from fetch_improved import UNReportFetcher
+    from parse import UNReportParser
+    REBUILD_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Corpus rebuild modules not available: {e}")
+    REBUILD_AVAILABLE = False
 
 # Page configuration
 st.set_page_config(
@@ -447,6 +454,11 @@ def format_citations(chunks: List[Dict[str, Any]], citation_threshold: float = 0
 
 def rebuild_corpus():
     """Rebuild the entire corpus (discover -> fetch -> parse -> index)."""
+    if not REBUILD_AVAILABLE:
+        st.error("❌ Corpus rebuilding is not available. This feature requires additional dependencies that are not installed.")
+        st.info("💡 The system comes pre-built with 535+ UN documents and is ready to use immediately.")
+        return False
+        
     config = load_app_config()
     
     with st.spinner("Rebuilding corpus..."):
