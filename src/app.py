@@ -105,6 +105,42 @@ def extract_document_mentions(query: str) -> List[str]:
     
     return list(set(mentions))
 
+def validate_citations(response_text: str, context_chunks: List[Dict[str, Any]]) -> str:
+    """Validate and fix citations in the response to prevent hallucinations."""
+    import re
+    
+    # Find all citation references in the response
+    citation_pattern = r'\[(\d+)\]'
+    cited_numbers = set(re.findall(citation_pattern, response_text))
+    
+    # Check which citations are valid (exist in context_chunks)
+    valid_citations = set(str(i) for i in range(1, len(context_chunks) + 1))
+    
+    # Find hallucinated citations
+    hallucinated_citations = cited_numbers - valid_citations
+    
+    if hallucinated_citations:
+        logger.warning(f"Found hallucinated citations: {hallucinated_citations}")
+        
+        # Remove hallucinated citations from the response
+        for hallucinated in hallucinated_citations:
+            # Remove the citation reference
+            response_text = re.sub(rf'\[{hallucinated}\]', '', response_text)
+        
+        # Add a disclaimer if we removed citations
+        if hallucinated_citations:
+            response_text += "\n\n*Note: Some citations were removed due to validation issues.*"
+    
+    # If no valid context was provided but response contains citations, add warning
+    if not context_chunks and cited_numbers:
+        logger.warning("Response contains citations but no context was provided")
+        # Remove all citations since no context exists
+        response_text = re.sub(r'\[\d+\]', '', response_text)
+        if "*Note: Some citations were removed due to validation issues.*" not in response_text:
+            response_text += "\n\n*Note: This response is based on general knowledge, not specific UN documents.*"
+    
+    return response_text
+
 def enhanced_search(indexer, query: str, conversation_history: List[Dict[str, Any]], 
                    top_k: int = 5, min_threshold: float = 0.3) -> List[Dict[str, Any]]:
     """Enhanced search that considers conversation context and document focus."""
@@ -235,14 +271,21 @@ CORE CAPABILITIES:
 2. **Analysis Mode**: Provide detailed analysis, synthesis, and insights from UN reports  
 3. **Conversation Mode**: Maintain context and have meaningful discussions about UN topics
 
+CRITICAL CITATION RULES:
+- ONLY cite sources [1], [2], etc. if the information comes directly from the provided context
+- NEVER make up or hallucinate citations
+- If providing general analysis or opinion not found in the context, do NOT use citations
+- When uncertain about specific facts, clearly indicate uncertainty
+- If no relevant context is provided, acknowledge this and provide general knowledge without citations
+
 RESPONSE GUIDELINES:
-- Always cite sources using [1], [2], etc. format
 - Be conversational and engaging, not just factual
 - Connect information across documents when relevant
 - Acknowledge conversation history and build on previous exchanges
 - If focusing on a specific document, prioritize information from that document
 - Provide analysis and insights, not just facts
-- Be precise but also contextual and explanatory""")
+- Be precise but also contextual and explanatory
+- Distinguish between information from provided sources vs. general knowledge""")
 
     # Add conversation context if available
     if conv_context:
@@ -291,7 +334,12 @@ Remember: You're not just a search engine - you're a conversational partner help
         answer = response.choices[0].message.content
         logger.info(f"OpenAI response received, length: {len(answer)} characters")
         
-        return answer
+        # Validate citations to prevent hallucinations
+        validated_answer = validate_citations(answer, context_chunks)
+        if validated_answer != answer:
+            logger.warning("Citation validation removed hallucinated citations")
+        
+        return validated_answer
         
     except Exception as e:
         logger.error(f"OpenAI API error: {e}")
@@ -584,7 +632,11 @@ def main():
                 logger.info(f"Enhanced search returned {len(results)} results")
                 
                 if not results:
-                    response = "I couldn't find any relevant information in the UN reports corpus for your query."
+                    # For questions that might be general/analytical, provide helpful response
+                    if any(word in query.lower() for word in ['what is', 'why', 'how', 'purpose', 'point', 'benefit']):
+                        response = f"I don't have specific information from recent UN reports that directly addresses your question about '{query}'. For general questions about UN processes and purposes, I can provide context, but it would be based on general knowledge rather than specific recent reports in my knowledge base."
+                    else:
+                        response = "I couldn't find any relevant information in the UN reports corpus for your query."
                     citations = ""
                     logger.info("No search results found")
                 else:
@@ -666,7 +718,10 @@ def main():
                             results = enhanced_search(indexer, query, st.session_state.messages, top_k=top_k, min_threshold=min_threshold)
                             
                             if not results:
-                                response = "I couldn't find any relevant information in the UN reports corpus for your query."
+                                if any(word in query.lower() for word in ['what is', 'why', 'how', 'purpose', 'point', 'benefit']):
+                                    response = f"I don't have specific information from recent UN reports that directly addresses your question about '{query}'. For general questions about UN processes and purposes, I can provide context, but it would be based on general knowledge rather than specific recent reports in my knowledge base."
+                                else:
+                                    response = "I couldn't find any relevant information in the UN reports corpus for your query."
                                 citations = ""
                             else:
                                 response = get_chat_response(query, results, config, st.session_state.messages)
@@ -718,7 +773,10 @@ def main():
                             results = enhanced_search(indexer, query, st.session_state.messages, top_k=top_k, min_threshold=min_threshold)
                             
                             if not results:
-                                response = "I couldn't find any relevant information in the UN reports corpus for your query."
+                                if any(word in query.lower() for word in ['what is', 'why', 'how', 'purpose', 'point', 'benefit']):
+                                    response = f"I don't have specific information from recent UN reports that directly addresses your question about '{query}'. For general questions about UN processes and purposes, I can provide context, but it would be based on general knowledge rather than specific recent reports in my knowledge base."
+                                else:
+                                    response = "I couldn't find any relevant information in the UN reports corpus for your query."
                                 citations = ""
                             else:
                                 response = get_chat_response(query, results, config, st.session_state.messages)
