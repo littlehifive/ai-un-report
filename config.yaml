@@ -55,7 +55,7 @@ retrieval:
 # OpenAI settings (optimized for cost)
 openai:
   embedding_model: "text-embedding-3-small"  # Cheapest embedding model
-  chat_model: "gpt-3.5-turbo"               # Much cheaper than GPT-4
+  chat_model: "gpt-4o-mini"                 # Better quality than 3.5-turbo, cheaper than 4o
   max_tokens: 1000                          # Reduced tokens to save cost
 
 # Local BGE fallback
