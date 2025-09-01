@@ -14,7 +14,7 @@ import sys
 sys.path.append(str(Path(__file__).parent))
 
 from utils import load_config, load_openai_key, setup_logging
-from index import UNReportIndexer
+from index_improved import RateLimitedUNReportIndexer as UNReportIndexer
 from discover import UNReportDiscoverer
 from fetch import UNReportFetcher
 from parse import UNReportParser
@@ -247,7 +247,10 @@ def rebuild_corpus():
             # Step 4: Index
             status_text.text("🔍 Creating embeddings index...")
             indexer = UNReportIndexer(config)
-            index_result = indexer.create_index()
+            # Limit chunks during rebuild to avoid hitting API limits
+            max_docs = config.get('corpus', {}).get('target_documents', 500)
+            max_chunks = max_docs * 2
+            index_result = indexer.create_index(max_chunks=max_chunks)
             progress_bar.progress(100)
             
             if index_result['success']:

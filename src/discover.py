@@ -348,22 +348,52 @@ class UNReportDiscoverer:
         self.start_date, self.end_date = get_date_window(config['date_window_days'])
         
     def discover_all(self) -> List[Dict[str, Any]]:
-        """Main discovery method using improved API."""
-        logger.info("Starting enhanced UN reports discovery...")
+        """Main discovery method with comprehensive search strategies."""
+        logger.info("Starting comprehensive UN reports discovery...")
         
         all_reports = []
         
-        # Search for 2025 reports
+        # Greatly expanded search queries for broader coverage
         queries = [
-            "reports 2025 english",
+            # Year-based searches
+            "2025 english",
+            "reports 2025",
+            "documents 2025",
+            
+            # UN body searches
             "General Assembly 2025",
-            "Security Council 2025",
-            "Secretary-General report 2025"
+            "Security Council 2025", 
+            "ECOSOC 2025",
+            "Economic and Social Council 2025",
+            "Secretary-General 2025",
+            "Secretariat 2025",
+            
+            # Report type searches
+            "annual report 2025",
+            "progress report 2025", 
+            "situation report 2025",
+            "implementation 2025",
+            "review 2025",
+            
+            # Thematic searches
+            "sustainable development 2025",
+            "climate 2025",
+            "peacekeeping 2025",
+            "humanitarian 2025",
+            "human rights 2025",
+            "decolonization 2025",
+            
+            # Document series searches
+            "A/80/ 2025",
+            "A/79/ 2025", 
+            "S/2025/",
+            "E/2025/",
+            "DP/2025/",
         ]
         
         for query in queries:
             try:
-                reports = self.client.search_reports(query, max_results=20)
+                reports = self.client.search_reports(query, max_results=50)  # Increased per query
                 logger.info(f"Query '{query}' found {len(reports)} reports")
                 
                 # Deduplicate by symbol
