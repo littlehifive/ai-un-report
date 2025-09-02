@@ -11,7 +11,10 @@
       "Bash(pdfinfo:*)",
       "Bash(curl:*)",
       "Bash(pkill:*)",
-      "Bash(./scripts/build_all.sh:*)"
+      "Bash(./scripts/build_all.sh:*)",
+      "WebSearch",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:medium.com)"
     ],
     "deny": [],
     "ask": []

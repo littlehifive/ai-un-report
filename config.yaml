@@ -75,6 +75,7 @@ paths:
 # Corpus management
 corpus:
   target_documents: 500        # Reduced for demo to avoid rate limits
+  max_chunks_total: 4000       # Maximum total chunks to index (increased from 1000)
   max_size_gb: 8               # Allow much larger corpus
   prioritize_recent: true      # Favor newer documents
   core_only: false             # Use expanded dataset

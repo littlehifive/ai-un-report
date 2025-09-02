@@ -561,14 +561,34 @@ def main():
         if indexer:
             stats = indexer.get_index_stats()
             
-            # Calculate accurate document and chunk counts
-            if hasattr(indexer, 'chunk_metadata') and indexer.chunk_metadata:
-                # Count unique documents by symbol (most reliable identifier)
-                doc_count = len(set(chunk.get('symbol', '') for chunk in indexer.chunk_metadata if chunk.get('symbol')))
-                chunk_count = len(indexer.chunk_metadata)
-            else:
-                doc_count = 0 
-                chunk_count = 0
+            # Get comprehensive document and chunk counts from the full parsed data
+            try:
+                import pandas as pd
+                chunks_df = pd.read_parquet('data/parsed/chunks.parquet')
+                total_doc_count = chunks_df['symbol'].nunique()
+                total_chunk_count = len(chunks_df)
+                
+                # Also get currently indexed counts for comparison
+                if hasattr(indexer, 'chunk_metadata') and indexer.chunk_metadata:
+                    indexed_doc_count = len(set(chunk.get('symbol', '') for chunk in indexer.chunk_metadata if chunk.get('symbol')))
+                    indexed_chunk_count = len(indexer.chunk_metadata)
+                else:
+                    indexed_doc_count = 0
+                    indexed_chunk_count = 0
+                
+                # Show only what's actually indexed and searchable
+                doc_count = indexed_doc_count  
+                chunk_count = indexed_chunk_count
+                
+            except Exception as e:
+                logger.warning(f"Could not load full chunks data: {e}")
+                # Fallback to indexed counts
+                if hasattr(indexer, 'chunk_metadata') and indexer.chunk_metadata:
+                    doc_count = len(set(chunk.get('symbol', '') for chunk in indexer.chunk_metadata if chunk.get('symbol')))
+                    chunk_count = len(indexer.chunk_metadata)
+                else:
+                    doc_count = 0 
+                    chunk_count = 0
             
             # Show user-friendly information
             st.info(f"""
@@ -578,6 +598,15 @@ def main():
             **🔍 {chunk_count} Searchable Sections**  
             Each report is divided into sections for better search
             """)
+            
+            # Show expansion info if more documents are available  
+            try:
+                chunks_df = pd.read_parquet('data/parsed/chunks.parquet')
+                total_available = chunks_df['symbol'].nunique()
+                if total_available > doc_count:
+                    st.info(f"📈 **{total_available:,} total documents** available in repository  \n💡 Currently searching {doc_count} for cost-effective operation")
+            except Exception:
+                pass
             
             if stats.get('created_at'):
                 try:

@@ -507,7 +507,7 @@ def main():
     indexer = RateLimitedUNReportIndexer(config)
     
     # Create or rebuild index with chunk limit to avoid rate limits
-    max_chunks = config.get('corpus', {}).get('target_documents', 500) * 2  # Limit chunks
+    max_chunks = config.get('corpus', {}).get('max_chunks_total', 4000)  # Use new configurable limit
     result = indexer.rebuild_if_needed(max_chunks=max_chunks)
     
     if result['success']:
