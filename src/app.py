@@ -829,9 +829,9 @@ Feel free to rephrase your question or ask about a different topic!"""
         with col1:
             st.markdown("**🔍 Search Mode:**")
             search_queries = [
-                "What recent reports discuss climate change?",
-                "Show me Statistical Commission reports from 2025",
-                "Find reports about sustainable development goals"
+                "What Security Council resolutions were adopted in 2025?",
+                "Find Secretary-General reports on economic issues",
+                "Show me reports about gender equality and human rights"
             ]
             
             for query in search_queries:
@@ -884,9 +884,9 @@ Feel free to rephrase your question or ask about a different topic!"""
         with col2:
             st.markdown("**💭 Conversation Mode:**")
             conversation_starters = [
-                "Tell me about the latest technology and innovation report",
-                "What are the main challenges in peacekeeping in recent reports?", 
-                "Help me understand the economic situation discussed in UN reports"
+                "What does the Secretary-General say about sustainable development?",
+                "How do recent reports address environmental issues?", 
+                "What humanitarian challenges are highlighted in 2025 reports?"
             ]
             
             for query in conversation_starters:
