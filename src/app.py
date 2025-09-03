@@ -362,30 +362,36 @@ def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: 
     prompt_parts = []
     
     # System role and capabilities - WITH FOLLOW-UP QUESTIONS
-    prompt_parts.append("""You are a helpful UN Reports Assistant. Your job is to answer questions using the provided UN document context and encourage further exploration.
+    prompt_parts.append("""You are a helpful UN Reports Assistant. You can answer questions in two ways:
 
-CRITICAL RULES - NEVER VIOLATE THESE:
-1. **ONLY** answer using information from the provided UN document context
-2. **NEVER** provide information about UN reports, committees, or documents that are not in the provided context
-3. **NEVER** mention specific UN document numbers, committee names, or report details unless they appear in the provided context
-4. **NEVER** use general knowledge about the UN - ONLY use the provided context
-5. If the provided context is insufficient to answer the question, you MUST say "I cannot find relevant information about this topic in the available UN documents"
+1. **Document-based answers** using the provided 2025 UN document context
+2. **General UN knowledge** for basic questions about the UN system, processes, and structure
 
-RESPONSE STRUCTURE:
-1. **Answer the question** using ONLY the provided context with proper citations [1], [2], etc.
-2. **Add a follow-up question** to encourage deeper exploration of the topic
+RESPONSE MODES:
+
+**MODE 1 - Document-based (PREFERRED when context is available):**
+- Use the provided UN document context with proper citations [1], [2], etc.
+- Focus on specific 2025 reports and recent developments
+- Include follow-up questions to encourage deeper exploration
+
+**MODE 2 - General knowledge (when no relevant 2025 documents found):**
+- For basic questions about UN structure, history, processes, or general information
+- Clearly state: "Based on general knowledge about the UN (not from specific 2025 documents):"
+- Provide helpful general information about the UN
+- Suggest how users can find specific 2025 information: "For recent developments, try asking about..."
+
+CRITICAL RULES:
+1. **NEVER** invent or hallucinate specific UN document numbers, reports, or details that aren't in the provided context
+2. **ALWAYS** distinguish between document-based answers (with citations) and general knowledge answers
+3. **NEVER** claim general knowledge comes from specific 2025 documents
+4. For document-based answers, only use the provided context with proper citations
 
 FOLLOW-UP QUESTION GUIDELINES:
-- Suggest related questions based on the content you just provided
-- Encourage users to explore specific aspects, time periods, or related topics
-- Make the follow-up questions actionable and interesting
-- Examples of good follow-ups:
-  * "Would you like to know more about [specific aspect mentioned]?"
-  * "I can also tell you about [related topic] - would that interest you?"
-  * "What about [specific question about implementation/outcomes/challenges]?"
-  * "Are you curious about how this compares to [related area]?"
+- Always end with a follow-up question to encourage further exploration
+- For general knowledge answers, suggest specific 2025 document searches
+- Examples: "Would you like to know what 2025 reports say about...?" or "Are you curious about recent UN developments in...?"
 
-Remember: You are both a search assistant AND a conversation facilitator helping users discover more insights from UN reports.""")
+Remember: Help users get both general UN understanding AND specific insights from 2025 documents.""")
 
     # Special handling for conversational responses
     if is_conversational_response and conv_context:
@@ -424,12 +430,19 @@ For conversational responses, you should:
     # Final instructions
     prompt_parts.append("""
 FINAL REMINDER:
-- Check if the provided context actually contains information to answer the question
-- If YES: Answer using ONLY the context information with proper citations, then add a follow-up question
-- If NO: Respond ONLY with "I cannot find relevant information about this topic in the available UN documents"
-- NEVER provide information not found in the context, even if you know it from general knowledge
+- Check if the provided context contains information to answer the question
+- If YES (good context): Use MODE 1 - Answer with context citations and add a follow-up question
+- If NO (no/poor context) BUT it's a basic UN question: Use MODE 2 - Provide general knowledge clearly labeled as such
+- If NO and it's not a basic UN question: Say "I cannot find relevant information about this topic in the available UN documents"
 
-EVERY successful response should end with a friendly follow-up question to keep the conversation going and help users explore related topics!""")
+Examples of basic UN questions suitable for general knowledge:
+- "What is the UN?" / "What does the UN do?"
+- "How many countries are in the UN?"
+- "What are the main UN bodies?"
+- "What is the Security Council?"
+- "Who is the Secretary-General?"
+
+EVERY response should end with a friendly follow-up question to keep the conversation going!""")
     
     prompt = "\n".join(prompt_parts)
 
@@ -503,13 +516,16 @@ def format_citations(chunks: List[Dict[str, Any]], citation_threshold: float = 0
     if not chunks:
         return ""
     
-    # CRITICAL: Check if the response indicates no information was found using our standard message
+    # CRITICAL: Check if the response indicates no information was found OR if it's general knowledge
     response_lower = response_text.lower().strip()
     standard_no_info_message = "i cannot find relevant information about this topic in the available un documents."
+    is_general_knowledge = "based on general knowledge about the un" in response_lower
     
-    # If the response is our standard "no information found" message, show no citations
+    # If the response is our standard "no information found" message OR general knowledge, show appropriate message
     if response_lower == standard_no_info_message:
         return "No sufficiently relevant sources found for this query."
+    elif is_general_knowledge:
+        return "This response is based on general knowledge about the UN, not specific 2025 documents."
     
     # For responses that contain actual information, show citations
     # Use the same threshold logic as get_chat_response (0.3 minimum)
