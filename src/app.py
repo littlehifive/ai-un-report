@@ -632,7 +632,7 @@ def main():
     
     # Title and description
     st.title("🇺🇳 UN Reports Assistant")
-    st.markdown("💬 Ask me anything about UN reports from 2025. I'll search through a list of official documents to give you accurate, cited answers.")
+    st.markdown("💬 Ask me anything about UN reports from 2025. I'll search through hundreds of official documents to give you accurate, cited answers.")
     
     # Load configuration
     config = load_app_config()
@@ -691,7 +691,7 @@ def main():
                 chunks_df = pd.read_parquet('data/parsed/chunks.parquet')
                 total_available = chunks_df['symbol'].nunique()
                 if total_available > doc_count:
-                    st.info(f"📈 **{total_available:,} total documents** available in repository  \n💡 Currently searching {doc_count} for cost-effective operation")
+                    st.warning(f"📈 **{total_available:,} total documents** available in repository  \n💡 Currently searching {doc_count} for cost-effective operation")
             except Exception:
                 pass
             
@@ -703,19 +703,51 @@ def main():
                 except:
                     st.caption("📅 Recently updated")
                     
-            # Show what types of reports are available
-            st.markdown("**📋 Report Types:**")
-            st.markdown("""
-            • Security Council resolutions & reports
-            • General Assembly documents  
-            • Economic & Social Council reports
-            • Secretary-General reports
-            • Human Rights Council findings
-            • Development program updates
-            """)
-            
         else:
             st.warning("❌ Knowledge base not available")
+        
+        st.markdown("---")
+        
+        # Filters (if we have data) - moved before Options
+        if indexer and indexer.chunk_metadata:
+            st.header("🔍 Filters")
+            
+            # Get available organs with display-friendly names
+            all_organs = list(set(chunk.get('organ', '') for chunk in indexer.chunk_metadata if chunk.get('organ')))
+            
+            # Create mapping for better display of long names
+            organ_display_map = {}
+            for organ in all_organs:
+                if len(organ) > 25:  # If name is too long
+                    if 'Economic and Social Council' in organ:
+                        organ_display_map[organ] = 'ECOSOC'
+                    elif 'General Assembly' in organ:
+                        organ_display_map[organ] = 'General Assembly'
+                    elif 'Security Council' in organ:
+                        organ_display_map[organ] = 'Security Council'
+                    else:
+                        # Truncate other long names
+                        organ_display_map[organ] = organ[:22] + '...'
+                else:
+                    organ_display_map[organ] = organ
+            
+            # Use format_func to show short names but return full names
+            selected_organs = st.multiselect(
+                "UN Bodies", 
+                all_organs, 
+                default=all_organs,
+                format_func=lambda x: organ_display_map[x]
+            )
+            
+            # Date range
+            st.subheader("Date Range")
+            date_filter = st.checkbox("Filter by date", value=False)
+            if date_filter:
+                col1, col2 = st.columns(2)
+                with col1:
+                    start_date = st.date_input("From", value=datetime.now() - timedelta(days=365))
+                with col2:
+                    end_date = st.date_input("To", value=datetime.now())
         
         st.markdown("---")
         
@@ -755,24 +787,6 @@ def main():
         st.session_state.top_k = top_k
         st.session_state.min_threshold = min_threshold
         st.session_state.citation_threshold = citation_threshold
-        
-        # Filters (if we have data)
-        if indexer and indexer.chunk_metadata:
-            st.header("🔍 Filters")
-            
-            # Get available organs
-            all_organs = list(set(chunk.get('organ', '') for chunk in indexer.chunk_metadata if chunk.get('organ')))
-            selected_organs = st.multiselect("UN Bodies", all_organs, default=all_organs[:3])
-            
-            # Date range
-            st.subheader("Date Range")
-            date_filter = st.checkbox("Filter by date", value=False)
-            if date_filter:
-                col1, col2 = st.columns(2)
-                with col1:
-                    start_date = st.date_input("From", value=datetime.now() - timedelta(days=365))
-                with col2:
-                    end_date = st.date_input("To", value=datetime.now())
     
     # Main chat interface
     if not indexer:
