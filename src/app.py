@@ -786,7 +786,7 @@ def main():
                 st.rerun()
         
         # Advanced settings (collapsed by default)
-        with st.expander("⚙️ Advanced Search Settings"):
+        with st.expander("⚙️ Advanced Settings"):
             top_k = st.slider("Number of sources to search", 3, 15, 5,
                             help="How many document sections to consider when answering")
             min_threshold = st.slider("Search precision", 0.0, 1.0, 0.3, step=0.05,
@@ -1001,7 +1001,7 @@ Feel free to rephrase your question or ask about a different topic!"""
         with col2:
             st.markdown("**💭 Conversation Mode:**")
             conversation_starters = [
-                "What does the Secretary-General say about sustainable development?",
+                "What does the Secretary-General say about SDG?",
                 "How do recent reports address environmental issues?", 
                 "What humanitarian challenges are highlighted in 2025 reports?"
             ]
