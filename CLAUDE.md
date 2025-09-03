@@ -45,10 +45,10 @@ ai-un-report/
 │   └── build_all.sh      # Full pipeline build
 ├── src/
 │   ├── app.py            # Main Streamlit application
-│   ├── discover_improved.py  # UN document discovery
-│   ├── fetch_improved.py     # PDF downloading
+│   ├── discover.py           # UN document discovery
+│   ├── fetch.py              # PDF downloading
 │   ├── parse.py              # Text extraction
-│   ├── index_improved.py     # Vector indexing
+│   ├── indexer.py            # Vector indexing
 │   └── utils.py              # Shared utilities
 └── data/
     ├── 2025-core/raw/     # Downloaded UN PDFs

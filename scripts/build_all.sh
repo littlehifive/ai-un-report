@@ -58,7 +58,7 @@ echo ""
 echo "🔍 Step 4: Creating embeddings index..."
 echo "--------------------------------------"
 cd src
-python index.py
+python indexer.py
 if [ $? -ne 0 ]; then
     echo "❌ Indexing failed!"
     exit 1

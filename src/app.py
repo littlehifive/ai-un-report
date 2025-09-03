@@ -18,12 +18,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from utils import load_config, load_openai_key, setup_logging
-from index_improved import RateLimitedUNReportIndexer as UNReportIndexer
+from indexer import RateLimitedUNReportIndexer as UNReportIndexer
 
 # Optional imports for corpus rebuilding (not needed for normal usage)
 try:
-    from discover_improved import UNReportDiscoverer
-    from fetch_improved import UNReportFetcher
+    from discover import UNReportDiscoverer
+    from fetch import UNReportFetcher
     from parse import UNReportParser
     REBUILD_AVAILABLE = True
 except ImportError as e:
