@@ -72,7 +72,7 @@ def initialize_indexer(_config, _cache_key):
         else:
             friendly_date = "recently"
             
-        st.success(f"✅ Ready to search {load_result['total_chunks']} UN document sections (last updated {friendly_date})")
+        # Status message removed - keep it clean
         return indexer, load_result
     else:
         st.error(f"❌ Unable to load UN documents: {load_result['error']}")
@@ -648,7 +648,7 @@ def main():
     
     # Title and description
     st.title("🇺🇳 UN Reports Assistant")
-    st.markdown("💬 Ask me anything about UN reports from 2025. I'll search through hundreds of official documents to give you accurate, cited answers.")
+    st.info("💬 Ask me anything about UN reports from 2025. I'll search through hundreds of official documents to give you accurate, cited answers.")
     
     # Load configuration
     config = load_app_config()
@@ -694,7 +694,7 @@ def main():
                     chunk_count = 0
             
             # Show user-friendly information
-            st.info(f"""
+            st.success(f"""
             **📄 {doc_count} UN Reports**  
             From 2025 across all UN bodies
             
@@ -770,9 +770,9 @@ def main():
         # Simple controls section
         st.header("🛠 Options")
         
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([1, 1])
         with col1:
-            if st.button("💬 New Chat", help="Start a fresh conversation"):
+            if st.button("💬 New Chat", help="Start a fresh conversation", use_container_width=True):
                 st.session_state.messages = []
                 st.session_state.document_focus = None
                 st.session_state.conversation_topic = None
@@ -780,7 +780,7 @@ def main():
                 st.rerun()
         
         with col2:
-            if st.button("🔄 Refresh", help="Reload the knowledge base"):
+            if st.button("🔄 Refresh", help="Reload the knowledge base", use_container_width=True):
                 st.cache_resource.clear()
                 st.success("Refreshed!")
                 st.rerun()
@@ -939,7 +939,7 @@ Feel free to rephrase your question or ask about a different topic!"""
     
     # Example queries
     if len(st.session_state.messages) == 0:
-        st.markdown("### 💡 Try these conversational examples:")
+        st.markdown("### ❓ Try these conversational examples:")
         
         col1, col2 = st.columns(2)
         
@@ -1056,9 +1056,10 @@ Feel free to rephrase your question or ask about a different topic!"""
         
         st.markdown("""
         **💡 Pro Tips:**
-        - Ask follow-up questions like "What does this report say about..." 
-        - Reference specific documents: "In report A/79/123, what..."
-        - Build conversations: "How does this compare to previous years?"
+        - Ask follow-up questions: "Tell me more" or "What about humanitarian aid?"
+        - Reference specific documents: "What does A/79/123 say about climate change?"
+        - Build conversations: "Yes, continue" or "How does this relate to SDGs?"
+        - Try conversational responses after getting an answer
         """)
 
 if __name__ == "__main__":
