@@ -711,14 +711,20 @@ def main():
             Each report is divided into sections for better search
             """)
             
-            # Show expansion info if more documents are available  
+            # Warning about indexed vs available reports
             try:
                 chunks_df = pd.read_parquet('data/parsed/chunks.parquet')
                 total_available = chunks_df['symbol'].nunique()
-                if total_available > doc_count:
-                    st.warning(f"📈 **{total_available:,} total documents** available in repository  \n💡 Currently searching {doc_count} for cost-effective operation")
+                st.warning(f"""
+                ⚠️ **{total_available:,} reports** have been indexed in the knowledge base for this minimal demo
+                ⚠️ **{doc_count} UN reports** are searchable in the demo due to API credit cost control
+                """)
             except Exception:
-                pass
+                # Fallback warning with static numbers
+                st.warning(f"""
+                ⚠️ **535+ reports** have been indexed in the knowledge base for this minimal demo 
+                ⚠️ **{doc_count} UN reports** are searchable in the demo due to API credit cost control
+                """)
             
             if stats.get('created_at'):
                 try:
