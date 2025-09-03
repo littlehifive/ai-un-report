@@ -27,7 +27,7 @@ try:
     from parse import UNReportParser
     REBUILD_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"Corpus rebuild modules not available: {e}")
+    logger.debug(f"Corpus rebuild modules not available: {e}")
     REBUILD_AVAILABLE = False
 
 # Page configuration
@@ -946,8 +946,8 @@ Feel free to rephrase your question or ask about a different topic!"""
         with col1:
             st.markdown("**🔍 Search Mode:**")
             search_queries = [
-                "What Security Council resolutions were adopted in 2025?",
-                "Find Secretary-General reports on economic issues",
+                "What does the 2025 technology and innovation report say about AI?",
+                "Find information about SDG from ECOSOC reports",
                 "Show me reports about gender equality and human rights"
             ]
             
