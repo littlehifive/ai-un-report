@@ -647,8 +647,9 @@ def main():
     """Main Streamlit application."""
     
     # Title and description
-    st.title("🇺🇳 UN Reports Assistant")
-    st.info("💬 Ask me anything about UN reports from 2025. I'll search through hundreds of official documents to give you accurate, cited answers.")
+    st.title("🇺🇳 AskUN - United Nations Report Assistant")
+    st.caption("Created by Zezhen Wu • [Follow me on LinkedIn](https://www.linkedin.com/in/zezhenwu/) • [Submit an Issue on GitHub](https://github.com/littlehifive/ai-un-report)")
+    st.info("💬 Ask me anything about public UN reports from 2025. I'll search through hundreds of official documents to give you accurate, cited answers.")
     
     # Load configuration
     config = load_app_config()
@@ -794,10 +795,21 @@ def main():
             citation_threshold = st.slider("Citation quality", 0.0, 1.0, 0.4, step=0.05,
                                         help="Higher values = show only the most relevant sources")
         
-        # Admin controls (only show if rebuild is needed)
-        if not REBUILD_AVAILABLE:
-            st.markdown("---")
-            st.caption("🔧 System administrators can rebuild the knowledge base to include newer reports")
+        # Technical information section
+        st.markdown("---")
+        st.markdown("""
+        <div style="color: #6c757d; font-size: 0.875rem;">
+        <strong>🔧 Technical Setup:</strong><br>
+        • <strong>Chat Model:</strong> GPT-4o-mini (OpenAI)<br>
+        • <strong>Embeddings:</strong> text-embedding-3-small (OpenAI)<br>
+        • <strong>Vector DB:</strong> FAISS (local)<br>
+        • <strong>Evaluation:</strong> LangFuse monitoring<br>
+        • <strong>Deployment:</strong> Streamlit Cloud<br>
+        • <strong>RAG Pipeline:</strong> Custom semantic search with citation validation<br>
+        • <strong>Data Source:</strong> <a href="https://digitallibrary.un.org/?ln=en" style="color: #6c757d;">UN Digital Library</a><br>
+        • <strong>API:</strong> <a href="https://digitallibrary.un.org/help/record-api?ln=en" style="color: #6c757d;">UN Record API</a>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Store settings in session state for access outside sidebar
         st.session_state.top_k = top_k
