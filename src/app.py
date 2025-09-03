@@ -38,6 +38,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Make sidebar wider
+st.markdown("""
+    <style>
+    .css-1d391kg {width: 350px;}
+    .css-1aumxhk {width: 350px;}
+    </style>
+    """, unsafe_allow_html=True)
+
 @st.cache_resource
 def load_app_config():
     """Load configuration (cached)."""
