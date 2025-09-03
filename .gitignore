@@ -26,7 +26,7 @@ wheels/
 # Data files
 data/raw/
 data/parsed/
-*.faiss
+# *.faiss
 *.parquet
 *.jsonl
 
