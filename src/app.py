@@ -78,22 +78,32 @@ def initialize_indexer(_config, _cache_key):
         st.error(f"❌ Unable to load UN documents: {load_result['error']}")
         return None, load_result
 
-def get_conversation_context(messages: List[Dict[str, Any]], max_messages: int = 3) -> str:
+def get_conversation_context(messages: List[Dict[str, Any]], max_messages: int = 4) -> str:
     """Extract recent conversation context for better responses."""
     if len(messages) <= 1:  # Only current message
         return ""
     
-    # Get last few message pairs (user + assistant)
+    # Get last few message pairs (user + assistant) - increased to 4 for better continuity
     recent_messages = messages[-(max_messages * 2):]
     context_parts = []
     
     for msg in recent_messages:
         role = msg["role"]
-        content = msg["content"][:300]  # Limit length
+        content = msg["content"][:500]  # Increased length for better context
         if role == "user":
             context_parts.append(f"User previously asked: {content}")
         elif role == "assistant":
-            context_parts.append(f"Assistant previously responded: {content}")
+            # Extract key information from assistant responses, especially follow-up questions
+            content_lines = content.split('\n')
+            # Get the main content and any follow-up questions
+            main_content = content_lines[0] if content_lines else content[:200]
+            follow_up_questions = [line for line in content_lines if '?' in line and ('would you like' in line.lower() or 'are you curious' in line.lower() or 'what about' in line.lower())]
+            
+            assistant_summary = main_content
+            if follow_up_questions:
+                assistant_summary += f" [Follow-up offered: {follow_up_questions[0][:100]}]"
+            
+            context_parts.append(f"Assistant previously responded: {assistant_summary}")
     
     return "\n".join(context_parts) if context_parts else ""
 
@@ -167,8 +177,47 @@ def enhanced_search(indexer, query: str, conversation_history: List[Dict[str, An
     document_mentions = extract_document_mentions(query)
     conv_context = get_conversation_context(conversation_history)
     
-    # Get initial search results
-    initial_results = indexer.search(query, top_k=top_k * 2, min_threshold=min_threshold)
+    # Handle conversational responses (yes, no, tell me more, etc.)
+    conversational_patterns = ['yes', 'yeah', 'sure', 'please', 'tell me more', 'continue', 'go on', 'more details', 'elaborate']
+    is_conversational_response = (
+        len(query.split()) <= 3 and 
+        any(pattern in query.lower() for pattern in conversational_patterns)
+    )
+    
+    # If this is a conversational response and we have context, search using previous context
+    if is_conversational_response and conv_context:
+        logger.info(f"Conversational response detected: '{query}' - using conversation context for search")
+        # Extract key terms from recent conversation to create a better search query
+        import re
+        # Get the last assistant response to understand what was previously discussed
+        if conversation_history:
+            last_messages = conversation_history[-4:] if len(conversation_history) >= 4 else conversation_history
+            assistant_content = ""
+            for msg in reversed(last_messages):
+                if msg["role"] == "assistant":
+                    assistant_content = msg["content"]
+                    break
+            
+            if assistant_content:
+                # Extract key topics from the previous response
+                topic_terms = re.findall(r'\b(?:humanitarian|challenges|women|children|vulnerable|population|afghanistan|food|security|health|malnutrition|funding|crisis|emergency|assistance)\b', assistant_content.lower())
+                if topic_terms:
+                    # Use the most relevant terms for search
+                    enhanced_query = ' '.join(list(set(topic_terms))[:5])  # Top 5 unique terms
+                    logger.info(f"Enhanced query for conversational response: '{enhanced_query}'")
+                    initial_results = indexer.search(enhanced_query, top_k=top_k * 2, min_threshold=min_threshold * 0.8)  # Lower threshold for conversational
+                else:
+                    # Fallback: use the original query with conversation context
+                    enhanced_query = query + " " + conv_context[:200]  # Add some context
+                    initial_results = indexer.search(enhanced_query, top_k=top_k * 2, min_threshold=min_threshold * 0.8)
+            else:
+                # No recent assistant content, use original query
+                initial_results = indexer.search(query, top_k=top_k * 2, min_threshold=min_threshold)
+        else:
+            initial_results = indexer.search(query, top_k=top_k * 2, min_threshold=min_threshold)
+    else:
+        # Get initial search results normally
+        initial_results = indexer.search(query, top_k=top_k * 2, min_threshold=min_threshold)
     
     # If specific documents are mentioned, filter and prioritize them
     if document_mentions:
@@ -262,10 +311,23 @@ def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: 
     conv_context = get_conversation_context(conversation_history)
     document_mentions = extract_document_mentions(query)
     
+    # Handle conversational responses - detect if this is a "yes" or continuation 
+    conversational_patterns = ['yes', 'yeah', 'sure', 'please', 'tell me more', 'continue', 'go on', 'more details', 'elaborate']
+    is_conversational_response = (
+        len(query.split()) <= 3 and 
+        any(pattern in query.lower() for pattern in conversational_patterns)
+    )
+    
     # CRITICAL: Check if we have any meaningful context at all
     if not context_chunks:
-        logger.warning("No context chunks provided - returning no information found message")
-        return "I cannot find relevant information about this topic in the available UN documents."
+        # If this is a conversational response but no context chunks, check conversation history
+        if is_conversational_response and conv_context:
+            logger.info("Conversational response with no search results - using conversation context only")
+            # For conversational responses, we can work with conversation context even without new search results
+            # This will be handled below in the prompt
+        else:
+            logger.warning("No context chunks provided - returning no information found message")
+            return "I cannot find relevant information about this topic in the available UN documents."
     
     # Prepare context from chunks - use adaptive number based on relevance
     # Only include chunks that are actually relevant, up to a maximum of 5
@@ -276,9 +338,15 @@ def get_chat_response(query: str, context_chunks: List[Dict[str, Any]], config: 
     MINIMUM_RELEVANCE = 0.3  # Only include chunks with at least 30% relevance
     relevant_chunks = [chunk for chunk in context_chunks if chunk.get('similarity_score', 0) >= MINIMUM_RELEVANCE]
     
+    # Special handling for conversational responses
     if not relevant_chunks:
-        logger.warning(f"No chunks above minimum relevance threshold {MINIMUM_RELEVANCE} - returning no information found message")
-        return "I cannot find relevant information about this topic in the available UN documents."
+        if is_conversational_response and conv_context:
+            logger.info("Conversational response with conversation context - proceeding with context-only response")
+            # For conversational responses, we'll use conversation context even without good search results
+            relevant_chunks = []  # Empty chunks, will use conversation context only
+        else:
+            logger.warning(f"No chunks above minimum relevance threshold {MINIMUM_RELEVANCE} - returning no information found message")
+            return "I cannot find relevant information about this topic in the available UN documents."
     
     for i, chunk in enumerate(relevant_chunks[:max_chunks_for_context], 1):
         score = chunk.get('similarity_score', 0)
@@ -319,8 +387,24 @@ FOLLOW-UP QUESTION GUIDELINES:
 
 Remember: You are both a search assistant AND a conversation facilitator helping users discover more insights from UN reports.""")
 
+    # Special handling for conversational responses
+    if is_conversational_response and conv_context:
+        prompt_parts.append(f"""
+SPECIAL INSTRUCTIONS FOR CONVERSATIONAL RESPONSE:
+The user gave a conversational response like "yes", "tell me more", etc. This means they want you to continue or expand on the previous conversation topic. Look at the conversation context below and continue that discussion by providing more detailed information, related aspects, or addressing the follow-up question that was previously offered.
+
+CONVERSATION CONTEXT:
+{conv_context}
+
+For conversational responses, you should:
+1. Identify what the user is responding "yes" to (look for follow-up questions in the conversation context)
+2. Continue that specific topic with more detail
+3. Use both the conversation context AND any current UN report context available
+4. Provide a natural continuation of the discussion
+""")
+    
     # Add conversation context if available
-    if conv_context:
+    if conv_context and not is_conversational_response:
         prompt_parts.append(f"\nCONVERSATION CONTEXT:\n{conv_context}")
     
     # Add document focus if mentioned
@@ -328,8 +412,11 @@ Remember: You are both a search assistant AND a conversation facilitator helping
         prompt_parts.append(f"\nUSER MENTIONED DOCUMENTS: {', '.join(document_mentions)}")
         prompt_parts.append("Focus primarily on these specific documents when answering.")
     
-    # Add current context
-    prompt_parts.append(f"\nCURRENT UN REPORT CONTEXT:\n{context}")
+    # Add current context (may be empty for conversational responses)
+    if context:
+        prompt_parts.append(f"\nCURRENT UN REPORT CONTEXT:\n{context}")
+    elif not is_conversational_response:
+        prompt_parts.append("\nCURRENT UN REPORT CONTEXT: [No additional context found]")
     
     # Add current query with instruction
     prompt_parts.append(f"\nCURRENT USER QUESTION: {query}")
